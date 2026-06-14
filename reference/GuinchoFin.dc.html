@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0A0A0A;--surface:#141414;--surface-2:#1C1C1C;--surface-3:#232323;--border:#262626;--divider:#1A1A1A;--border-strong:#353535;--fg-1:#FFFFFF;--fg-2:#B8B8B8;--fg-3:#6E6E6E;--gold-ink:#E2BE6A;--pos:#4FCB8E;--neg:#E0708A;--warn:#E6B547;--info:#7DA0E8}
+  :root[data-theme="light"]{--bg:#F1ECE1;--surface:#FFFFFF;--surface-2:#F6F2E9;--surface-3:#EFE9DB;--border:#E5DDCC;--divider:#EEE8DC;--border-strong:#D3C7AE;--fg-1:#221C13;--fg-2:#5E5648;--fg-3:#8C8069;--gold-ink:#8E6F22;--pos:#15915C;--neg:#C94560;--warn:#9C6F12;--info:#3C63B6}
+  *,*::before,*::after{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:#0A0A0A}
+  body{font-family:'Manrope',system-ui,sans-serif;color:#FFFFFF;-webkit-font-smoothing:antialiased}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#262626;border-radius:8px;border:2px solid #0A0A0A}
+  ::-webkit-scrollbar-track{background:transparent}
+  @keyframes gfFade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @keyframes gfPulse{0%,100%{opacity:1}50%{opacity:.35}}
+  @keyframes gfPop{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
+</style>
+</helmet>
+
+<div style="display:grid;grid-template-columns:248px 1fr;min-height:100vh;background:#0A0A0A">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside style="background:#0A0A0A;border-right:1px solid #262626;padding:18px 14px 14px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;gap:12px;padding:4px 6px 18px;border-bottom:1px solid #1A1A1A;margin-bottom:12px">
+      <div style="width:42px;height:42px;border-radius:11px;background:linear-gradient(135deg,#ECD08C,#D4A84A 45%,#B89238);display:flex;align-items:center;justify-content:center;color:#0A0A0A;box-shadow:0 4px 14px rgba(212,168,74,.25)">{{ brandTruck }}</div>
+      <div style="line-height:1.05">
+        <div style="font-weight:800;font-size:16px;letter-spacing:-.01em;color:#FFFFFF">GuinchoFin</div>
+        <div style="font-size:9.5px;font-weight:600;letter-spacing:.18em;color:#D4A84A;text-transform:uppercase;margin-top:4px">Gestão · Guincho</div>
+      </div>
+    </div>
+
+    <div style="font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#6E6E6E;padding:8px 10px 6px">Menu</div>
+    <sc-for list="{{ nav }}" as="n" hint-placeholder-count="5">
+      <a onClick="{{ n.onClick }}" style="{{ n.style }}">
+        <span style="display:flex;width:18px;justify-content:center;color:{{ n.iconColor }}">{{ n.icon }}</span>
+        <span>{{ n.label }}</span>
+        <sc-if value="{{ n.active }}" hint-placeholder-val="{{ false }}">
+          <span style="position:absolute;left:-14px;top:50%;transform:translateY(-50%);width:3px;height:18px;border-radius:0 3px 3px 0;background:linear-gradient(135deg,#ECD08C,#D4A84A 45%,#B89238);box-shadow:0 0 12px rgba(212,168,74,.55)"></span>
+        </sc-if>
+      </a>
+    </sc-for>
+
+    <div style="font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#6E6E6E;padding:18px 10px 6px">Integrações</div>
+    <a onClick="{{ navWa.onClick }}" style="{{ navWa.style }}">
+      <span style="display:flex;width:18px;justify-content:center;color:{{ navWa.iconColor }}">{{ navWa.icon }}</span>
+      <span>WhatsApp</span>
+      <span style="margin-left:auto;display:flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;color:#4FCB8E">
+        <span style="width:7px;height:7px;border-radius:50%;background:#4FCB8E;animation:gfPulse 2.4s ease-in-out infinite"></span>on
+      </span>
+      <sc-if value="{{ navWa.active }}" hint-placeholder-val="{{ false }}">
+        <span style="position:absolute;left:-14px;top:50%;transform:translateY(-50%);width:3px;height:18px;border-radius:0 3px 3px 0;background:linear-gradient(135deg,#ECD08C,#D4A84A 45%,#B89238);box-shadow:0 0 12px rgba(212,168,74,.55)"></span>
+      </sc-if>
+    </a>
+    <a onClick="{{ navOn.onClick }}" style="{{ navOn.style }}">
+      <span style="display:flex;width:18px;justify-content:center;color:{{ navOn.iconColor }}">{{ navOn.icon }}</span>
+      <span>Começar (3 passos)</span>
+      <sc-if value="{{ navOn.active }}" hint-placeholder-val="{{ false }}">
+        <span style="position:absolute;left:-14px;top:50%;transform:translateY(-50%);width:3px;height:18px;border-radius:0 3px 3px 0;background:linear-gradient(135deg,#ECD08C,#D4A84A 45%,#B89238);box-shadow:0 0 12px rgba(212,168,74,.55)"></span>
+      </sc-if>
+    </a>
+
+    <div style="margin-top:auto;display:flex;align-items:center;gap:10px;padding:12px 8px 4px;border-top:1px solid #1A1A1A">
+      <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#ECD08C,#D4A84A 45%,#B89238);color:#0A0A0A;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800">MS</div>
+      <div style="flex:1;line-height:1.2;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:#FFFFFF">Marcos Silva</div>
+        <div style="font-size:11px;color:#6E6E6E">Guincheiro · 3 caminhões</div>
+      </div>
+      <span style="color:#6E6E6E;cursor:pointer;display:flex">{{ I.logout }}</span>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main style="display:flex;flex-direction:column;min-width:0">
+
+    <!-- TOPBAR -->
+    <div style="display:flex;align-items:center;gap:14px;padding:13px 28px;border-bottom:1px solid #262626;background:#0A0A0A;position:sticky;top:0;z-index:20">
+      <div style="flex:1;max-width:440px;position:relative;display:flex;align-items:center">
+        <span style="position:absolute;left:12px;color:#6E6E6E;display:flex">{{ I.search }}</span>
+        <input placeholder="Buscar viagem, cliente, placa…" style="width:100%;height:40px;padding:0 14px 0 38px;border-radius:10px;border:1px solid #262626;background:#141414;font-family:inherit;font-size:13.5px;color:#FFFFFF;outline:none" />
+      </div>
+      <div style="display:flex;align-items:center;gap:9px;margin-left:auto">
+        <button onClick="{{ goWhats }}" style="display:flex;align-items:center;gap:8px;height:38px;padding:0 13px;border-radius:10px;border:1px solid #262626;background:#141414;color:#B8B8B8;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer">
+          <span style="width:8px;height:8px;border-radius:50%;background:#4FCB8E;box-shadow:0 0 8px rgba(79,203,142,.6)"></span>WhatsApp conectado
+        </button>
+        <button style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:#141414;border:1px solid #262626;color:#B8B8B8;cursor:pointer;position:relative">
+          {{ I.bell }}
+          <span style="position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;background:#D4A84A;border:2px solid #0A0A0A"></span>
+        </button>
+        <button onClick="{{ onNovo }}" style="display:flex;align-items:center;gap:7px;height:40px;padding:0 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#ECD08C,#D4A84A 45%,#B89238);color:#0A0A0A;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(212,168,74,.2)">{{ I.plus }} Novo lançamento</button>
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div style="padding:24px 28px 64px;max-width:1320px;width:100%">
+
+      <!-- ===== INÍCIO ===== -->
+      <sc-if value="{{ scInicio }}" hint-placeholder-val="{{ true }}">
+        <div>
+          <div style="margin-bottom:20px">
+            <h1 style="margin:0;font-size:27px;font-weight:700;letter-spacing:-.02em;color:#FFFFFF">Início</h1>
+            <p style="margin:5px 0 0;font-size:14px;color:#B8B8B8">Olá, Marcos. Veja como está o mês de <strong style="color:#FFFFFF;font-weight:600">junho</strong>.</p>
+          </div>
+
+          <!-- alerts -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px">
+            <sc-for list="{{ alerts }}" as="a" hint-placeholder-count="2">
+              <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:12px;background:{{ a.bg }};border:1px solid {{ a.border }}">
+                <span style="width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:{{ a.iconBg }};color:{{ a.iconFg }}">{{ a.icon }}</span>
+                <div style="min-width:0">
+                  <div style="font-size:13.5px;font-weight:700;color:#FFFFFF;letter-spacing:-.01em">{{ a.titulo }}</div>
+                  <div style="font-size:12.5px;color:#B8B8B8;margin-top:2px">{{ a.sub }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+
+          <!-- stat cards -->
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+            <sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
+              <div style="background:#141414;border:1px solid #262626;border-radius:14px;overflow:hidden">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:16px 18px 0">
+                  <div>
+                    <div style="font-size:13px;color:#B8B8B8;font-weight:500">{{ s.label }}</div>
+                    <div style="font-size:29px;font-weight:700;letter-spacing:-.02em;margin-top:6px;color:#FFFFFF;font-variant-numeric:tabular-nums">{{ s.valTxt }}</div>
+                    <div style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;margin-top:6px;color:{{ s.deltaColor }}">
+                      <sc-if value="{{ s.hasArrow }}" hint-placeholder-val="{{ true }}"><span style="display:flex">{{ s.arrow }}</span></sc-if>
+                      {{ s.delta }}<span style="color:#6E6E6E;font-weight:500">{{ s.sub }}</span>
+                    </div>
+                  </div>
+                  <span style="width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:{{ s.iconBg }};color:{{ s.iconFg }}">{{ s.icon }}</span>
+                </div>
+                <svg viewBox="0 0 260 56" preserveAspectRatio="none" style="width:100%;height:46px;display:block;margin-top:10px">
+                  <path d="{{ s.fill }}" fill="{{ s.color }}" fill-opacity="0.13"></path>
+                  <path d="{{ s.line }}" fill="none" stroke="{{ s.color }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+              </div>
+            </sc-for>
+          </div>
+
+          <!-- chart -->
+          <div style="background:#141414;border:1px solid #262626;border-radius:14px;margin-top:16px">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:18px 20px 4px">
+              <div>
+                <h3 style="margin:0;font-size:16px;font-weight:700;letter-spacing:-.01em;color:#FFFFFF">Entradas e saídas</h3>
+                <div style="margin:3px 0 0;font-size:13px;color:#6E6E6E">Últimos 6 meses</div>
+              </div>
+              <div style="display:flex;gap:16px;font-size:12.5px;font-weight:600">
+                <span style="display:flex;align-items:center;gap:7px;color:#B8B8B8"><span style="width:11px;height:11px;border-radius:3px;background:#E2BE6A"></span>Entradas</span>
+                <span style="display:flex;align-items:center;gap:7px;color:#B8B8B8"><span style="width:11px;height:11px;border-radius:3px;background:#E0708A"></span>Saídas</span>
+              </div>
+            </div>
+            <div style="padding:6px 14px 14px">
+              <svg viewBox="0 0 720 240" style="width:100%;height:260px;display:block">
+                <defs>
+                  <linearGradient id="gfEnt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E2BE6A" stop-opacity="0.22"/><stop offset="1" stop-color="#E2BE6A" stop-opacity="0"/></linearGradient>
+                  <linearGradient id="gfSai" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E0708A" stop-opacity="0.16"/><stop offset="1" stop-color="#E0708A" stop-opacity="0"/></linearGradient>
+                </defs>
+                <line x1="40" x2="700" y1="50" y2="50" stroke="#262626" stroke-dasharray="2 5"/>
+                <line x1="40" x2="700" y1="90" y2="90" stroke="#262626" stroke-dasharray="2 5"/>
+                <line x1="40" x2="700" y1="130" y2="130" stroke="#262626" stroke-dasharray="2 5"/>
+                <line x1="40" x2="700" y1="170" y2="170" stroke="#262626" stroke-dasharray="2 5"/>
+                <line x1="40" x2="700" y1="210" y2="210" stroke="#262626" stroke-dasharray="2 5"/>
+                <text x="8" y="54" font-size="10" fill="#6E6E6E" font-family="JetBrains Mono">40k</text>
+                <text x="8" y="134" font-size="10" fill="#6E6E6E" font-family="JetBrains Mono">20k</text>
+                <text x="8" y="214" font-size="10" fill="#6E6E6E" font-family="JetBrains Mono">0</text>
+                <path d="M60 93 C 100 86, 140 86, 180 80 S 260 110, 300 102 S 380 64, 420 62 S 500 73, 540 70 S 620 40, 660 34 L660 210 L60 210 Z" fill="url(#gfEnt)"/>
+                <path d="M60 156 C 100 152, 140 150, 180 147 S 260 162, 300 160 S 380 140, 420 138 S 500 150, 540 152 S 620 146, 660 147 L660 210 L60 210 Z" fill="url(#gfSai)"/>
+                <path d="M60 93 C 100 86, 140 86, 180 80 S 260 110, 300 102 S 380 64, 420 62 S 500 73, 540 70 S 620 40, 660 34" fill="none" stroke="#E2BE6A" stroke-width="2.6" stroke-linecap="round"/>
+                <path d="M60 156 C 100 152, 140 150, 180 147 S 260 162, 300 160 S 380 140, 420 138 S 500 150, 540 152 S 620 146, 660 147" fill="none" stroke="#E0708A" stroke-width="2.2" stroke-linecap="round"/>
+                <text x="60" y="232" font-size="11" fill="#6E6E6E" text-anchor="middle">Jan</text>
+                <text x="180" y="232" font-size="11" fill="#6E6E6E" text-anchor="middle">Fev</text>
+                <text x="300" y="232" font-size="11" fill="#6E6E6E" text-anchor="middle">Mar</text>
+                <text x="420" y="232" font-size="11" fill="#6E6E6E" text-anchor="middle">Abr</text>
+                <text x="540" y="232" font-size="11" fill="#6E6E6E" text-anchor="middle">Mai</text>
+                <text x="660" y="232" font-size="11" fill="#6E6E6E" text-anchor="middle">Jun</text>
+              </svg>
+            </div>
+          </div>
+
+          <!-- ranking + custo/km -->
+          <div style="display:grid;grid-template-columns:1.55fr 1fr;gap:16px;margin-top:16px">
+            <div style="background:#141414;border:1px solid #262626;border-radius:14px;padding:18px 20px">
+              <h3 style="margin:0 0 2px;font-size:16px;font-weight:700;letter-spacing:-.01em;color:#FFFFFF">Lucratividade por caminhão</h3>
+              <div style="font-size:13px;color:#6E6E6E;margin-bottom:16px">Lucro do mês · junho</div>
+              <sc-for list="{{ rankView }}" as="t" hint-placeholder-count="3">
+                <div style="margin-bottom:16px">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
+                    <div style="display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:600;color:#FFFFFF">
+                      <span style="width:9px;height:9px;border-radius:3px;background:{{ t.cor }}"></span>{{ t.nome }}
+                      <span style="font-size:11.5px;font-weight:500;color:#6E6E6E;font-family:'JetBrains Mono'">{{ t.custoTxt }}</span>
+                    </div>
+                    <div style="font-size:14px;font-weight:700;color:#FFFFFF;font-variant-numeric:tabular-nums">{{ t.lucroTxt }}</div>
+                  </div>
+                  <div style="height:8px;border-radius:6px;background:#1C1C1C;overflow:hidden">
+                    <div style="height:100%;width:{{ t.pct }}%;border-radius:6px;background:{{ t.cor }}"></div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="background:rgba(212,168,74,.07);border:1px solid rgba(212,168,74,.30);border-radius:14px;padding:18px 20px;display:flex;flex-direction:column">
+              <div style="font-size:13px;color:#E2BE6A;font-weight:600;letter-spacing:.02em">Custo médio por km</div>
+              <div style="font-size:40px;font-weight:800;letter-spacing:-.03em;color:#FFFFFF;margin-top:8px;font-variant-numeric:tabular-nums">{{ custoMediaTxt }}</div>
+              <div style="font-size:12.5px;color:#B8B8B8;margin-top:2px">média da frota · combustível + manutenção</div>
+              <div style="height:1px;background:#262626;margin:16px 0 14px"></div>
+              <div style="display:flex;flex-direction:column;gap:11px">
+                <sc-for list="{{ rankView }}" as="t" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px">
+                    <span style="color:#B8B8B8;font-weight:500;white-space:nowrap">{{ t.apelido }}</span>
+                    <span style="color:#FFFFFF;font-weight:600;font-family:'JetBrains Mono';font-size:12.5px;white-space:nowrap">{{ t.custoTxt }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+
+          <!-- últimos lançamentos -->
+          <div style="background:#141414;border:1px solid #262626;border-radius:14px;margin-top:16px;overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 20px 14px">
+              <div>
+                <h3 style="margin:0;font-size:16px;font-weight:700;letter-spacing:-.01em;color:#FFFFFF">Últimos lançamentos</h3>
+                <div style="font-size:13px;color:#6E6E6E;margin-top:2px">Viagens e despesas · origem indicada</div>
+              </div>
+              <button onClick="{{ nav.1.onClick }}" style="display:flex;align-items:center;gap:7px;height:36px;padding:0 13px;border-radius:9px;border:1px solid #262626;background:#1C1C1C;color:#FFFFFF;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Ver tudo {{ I.arrowR }}</button>
+            </div>
+            <div>
+              <sc-for list="{{ recent }}" as="r" hint-placeholder-count="6">
+                <div style="display:flex;align-items:center;gap:14px;padding:13px 20px;border-top:1px solid #1A1A1A">
+                  <span style="width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:{{ r.iconBg }};color:{{ r.iconFg }}">{{ r.icon }}</span>
+                  <div style="min-width:0;flex:1">
+                    <div style="font-size:13.5px;font-weight:600;color:#FFFFFF">{{ r.titulo }}</div>
+                    <div style="font-size:12px;color:#6E6E6E;margin-top:2px">{{ r.sub }}</div>
+                  </div>
+                  <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;background:{{ r.srcBg }};color:{{ r.srcFg }}">{{ r.srcIcon }}{{ r.srcLabel }}</span>
+                  <span style="font-size:13.5px;font-weight:700;color:{{ r.valorColor }};font-variant-numeric:tabular-nums;min-width:104px;text-align:right">{{ r.valorTxt }}</span>
+                  <span style="font-size:12px;color:#6E6E6E;font-family:'JetBrains Mono';min-width:42px;text-align:right">{{ r.data }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+      <!-- ===== VIAGENS ===== -->
+      <sc-if value="{{ scViagens }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="margin-bottom:18px">
+            <h1 style="margin:0;font-size:27px;font-weight:700;letter-spacing:-.02em;color:#FFFFFF">Viagens</h1>
+            <p style="margin:5px 0 0;font-size:14px;color:#B8B8B8">Toda viagem que você fez. Filtre por caminhão ou status do pagamento.</p>
+          </div>
+
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-bottom:16px">
+            <span style="font-size:12px;font-weight:600;color:#6E6E6E;text-transform:uppercase;letter-spacing:.08em;margin-right:2px">Status</span>
+            <sc-for list="{{ vStatusChips }}" as="c" hint-placeholder-count="3">
+              <button onClick="{{ c.onClick }}" style="{{ c.style }}">{{ c.label }}</button>
+            </sc-for>
+            <span style="width:1px;height:24px;background:#262626;margin:0 6px"></span>
+            <span style="font-size:12px;font-weight:600;color:#6E6E6E;text-transform:uppercase;letter-spacing:.08em;margin-right:2px">Caminhão</span>
+            <sc-for list="{{ vTruckChips }}" as="c" hint-placeholder-count="4">
+              <button onClick="{{ c.onClick }}" style="{{ c.style }}">{{ c.label }}</button>
+            </sc-for>
+          </div>
+
+          <div style="display:flex;gap:14px;margin-bottom:16px">
+            <div style="flex:1;background:#141414;border:1px solid #262626;border-radius:12px;padding:14px 18px">
+              <div style="font-size:12.5px;color:#6E6E6E;font-weight:500">Faturado no filtro</div>
+              <div style="font-size:22px;font-weight:700;color:#FFFFFF;margin-top:3px;font-variant-numeric:tabular-nums">{{ vFatTxt }}</div>
+            </div>
+            <div style="flex:1;background:#141414;border:1px solid #262626;border-radius:12px;padding:14px 18px">
+              <div style="font-size:12.5px;color:#6E6E6E;font-weight:500">Ainda a receber</div>
+              <div style="font-size:22px;font-weight:700;color:#E6B547;margin-top:3px;font-variant-numeric:tabular-nums">{{ vRecTxt }}</div>
+            </div>
+            <div style="flex:1;background:#141414;border:1px solid #262626;border-radius:12px;padding:14px 18px">
+              <div style="font-size:12.5px;color:#6E6E6E;font-weight:500">Mostrando</div>
+              <div style="font-size:22px;font-weight:700;color:#FFFFFF;margin-top:3px">{{ vCountTxt }}</div>
+            </div>
+          </div>
+
+          <div style="background:#141414;border:1px solid #262626;border-radius:14px;overflow:hidden">
+            <sc-for list="{{ viagensView }}" as="r" hint-placeholder-count="6">
+              <div style="display:flex;align-items:center;gap:16px;padding:15px 20px;border-top:1px solid #1A1A1A">
+                <span style="width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:rgba(212,168,74,.13);color:#E2BE6A">{{ r.icon }}</span>
+                <div style="flex:1;min-width:0">
+                  <div style="font-weight:600;font-size:14px;color:#FFFFFF;display:flex;align-items:center;gap:8px">{{ r.origem }}<span style="color:#6E6E6E;font-weight:400">→</span>{{ r.destino }}</div>
+                  <div style="font-size:12px;color:#6E6E6E;margin-top:4px;display:flex;align-items:center;gap:7px"><span style="display:flex;color:#6E6E6E">{{ r.clienteIcon }}</span>{{ r.cliente }} · {{ r.truck }} · {{ r.kmTxt }}</div>
+                </div>
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;background:{{ r.srcBg }};color:{{ r.srcFg }}">{{ r.srcIcon }}{{ r.srcLabel }}</span>
+                <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;font-size:11.5px;font-weight:600;background:{{ r.statusBg }};color:{{ r.statusFg }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ r.statusFg }}"></span>{{ r.statusLabel }}</span>
+                <span style="font-size:14px;font-weight:700;color:#FFFFFF;font-variant-numeric:tabular-nums;min-width:108px;text-align:right">{{ r.valorTxt }}</span>
+                <span style="font-size:12px;color:#6E6E6E;font-family:'JetBrains Mono';min-width:42px;text-align:right">{{ r.data }}</span>
+              </div>
+            </sc-for>
+            <sc-if value="{{ vEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:48px 20px;text-align:center;color:#6E6E6E;font-size:14px">Nenhuma viagem com esse filtro.</div>
+            </sc-if>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ===== DESPESAS ===== -->
+      <sc-if value="{{ scDespesas }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="margin-bottom:18px">
+            <h1 style="margin:0;font-size:27px;font-weight:700;letter-spacing:-.02em;color:#FFFFFF">Despesas</h1>
+            <p style="margin:5px 0 0;font-size:14px;color:#B8B8B8">Tudo que sai do bolso. Mande a foto do comprovante e a gente lança.</p>
+          </div>
+
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-bottom:16px">
+            <sc-for list="{{ dCatChips }}" as="c" hint-placeholder-count="5">
+              <button onClick="{{ c.onClick }}" style="{{ c.style }}">{{ c.label }}</button>
+            </sc-for>
+          </div>
+
+          <div style="display:flex;gap:14px;margin-bottom:16px">
+            <div style="flex:1;background:#141414;border:1px solid #262626;border-radius:12px;padding:14px 18px">
+              <div style="font-size:12.5px;color:#6E6E6E;font-weight:500">Total no filtro</div>
+              <div style="font-size:22px;font-weight:700;color:#E0708A;margin-top:3px;font-variant-numeric:tabular-nums">{{ dTotTxt }}</div>
+            </div>
+            <div style="flex:1;background:#141414;border:1px solid #262626;border-radius:12px;padding:14px 18px">
+              <div style="font-size:12.5px;color:#6E6E6E;font-weight:500">Lançamentos</div>
+              <div style="font-size:22px;font-weight:700;color:#FFFFFF;margin-top:3px">{{ dCountTxt }}</div>
+            </div>
+          </div>
+
+          <div style="background:#141414;border:1px solid #262626;border-radius:14px;overflow:hidden">
+            <sc-for list="{{ despesasView }}" as="d" hint-placeholder-count="6">
+              <div style="display:flex;align-items:center;gap:14px;padding:14px 20px;border-top:1px solid #1A1A1A">
+                <span style="width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:{{ d.iconBg }};color:{{ d.iconFg }}">{{ d.icon }}</span>
+                <sc-if value="{{ d.foto }}" hint-placeholder-val="{{ false }}">
+                  <div style="width:42px;height:54px;border-radius:7px;border:1px solid #2A2A2A;background:linear-gradient(160deg,#3b362f,#211e1a);flex-shrink:0;display:flex;flex-direction:column;gap:3px;padding:7px 5px;position:relative">
+                    <div style="height:4px;width:72%;background:rgba(255,255,255,.22);border-radius:2px"></div>
+                    <div style="height:3px;width:92%;background:rgba(255,255,255,.11);border-radius:2px"></div>
+                    <div style="height:3px;width:64%;background:rgba(255,255,255,.11);border-radius:2px"></div>
+                    <div style="height:3px;width:84%;background:rgba(255,255,255,.11);border-radius:2px"></div>
+                    <span style="position:absolute;right:2px;bottom:1px;width:13px;height:13px;border-radius:3px;background:rgba(212,168,74,.9);display:flex;align-items:center;justify-content:center;color:#0A0A0A;font-size:8px;font-weight:800">F</span>
+                  </div>
+                </sc-if>
+                <div style="flex:1;min-width:0">
+                  <div style="font-weight:600;font-size:14px;color:#FFFFFF">{{ d.desc }}</div>
+                  <div style="font-size:12px;color:#6E6E6E;margin-top:3px">{{ d.catLabel }} · {{ d.truck }}</div>
+                </div>
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;background:{{ d.srcBg }};color:{{ d.srcFg }}">{{ d.srcIcon }}{{ d.srcLabel }}</span>
+                <span style="font-size:14px;font-weight:700;color:#FFFFFF;font-variant-numeric:tabular-nums;min-width:108px;text-align:right">{{ d.valorTxt }}</span>
+                <span style="font-size:12px;color:#6E6E6E;font-family:'JetBrains Mono';min-width:42px;text-align:right">{{ d.data }}</span>
+              </div>
+            </sc-for>
+            <sc-if value="{{ dEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:48px 20px;text-align:center;color:#6E6E6E;font-size:14px">Nenhuma despesa nessa categoria.</div>
+            </sc-if>
+          </div>
+        </div>
+      </sc-if>
+      <!-- ===== CAMINHÕES ===== -->
+      <sc-if value="{{ scCaminhoes }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <sc-if value="{{ showTruckGrid }}" hint-placeholder-val="{{ true }}">
+            <div>
+              <div style="margin-bottom:18px">
+                <h1 style="margin:0;font-size:27px;font-weight:700;letter-spacing:-.02em;color:#FFFFFF">Caminhões</h1>
+                <p style="margin:5px 0 0;font-size:14px;color:#B8B8B8">Sua frota. Toque num caminhão para ver vencimentos e detalhes.</p>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+                <sc-for list="{{ trucksView }}" as="t" hint-placeholder-count="3">
+                  <div onClick="{{ t.onClick }}" style="background:#141414;border:1px solid #262626;border-radius:14px;padding:18px 20px;cursor:pointer;transition:border-color .12s" style-hover="border-color:#353535;background:#171717">
+                    <div style="display:flex;align-items:center;gap:13px">
+                      <span style="width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#1C1C1C;border:1px solid #262626;color:{{ t.cor }}">{{ t.icon }}</span>
+                      <div style="min-width:0">
+                        <div style="font-size:15.5px;font-weight:700;color:#FFFFFF;letter-spacing:-.01em">{{ t.apelido }}</div>
+                        <div style="font-size:12px;color:#6E6E6E;font-family:'JetBrains Mono';margin-top:2px">{{ t.placa }}</div>
+                      </div>
+                    </div>
+                    <div style="font-size:12.5px;color:#B8B8B8;margin-top:12px">{{ t.modelo }}</div>
+                    <div style="height:1px;background:#262626;margin:14px 0"></div>
+                    <div style="display:flex;flex-direction:column;gap:9px">
+                      <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px"><span style="color:#6E6E6E">Hodômetro</span><span style="color:#FFFFFF;font-weight:600;font-family:'JetBrains Mono';font-size:12.5px">{{ t.hodTxt }}</span></div>
+                      <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px"><span style="color:#6E6E6E">Custo por km</span><span style="color:#FFFFFF;font-weight:600;font-family:'JetBrains Mono';font-size:12.5px">{{ t.custoTxt }}</span></div>
+                      <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px"><span style="color:#6E6E6E">Próxima manut.</span><span style="color:#B8B8B8;font-weight:500">{{ t.prox }}</span></div>
+                    </div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding:12px 14px;border-radius:11px;background:rgba(212,168,74,.07);border:1px solid rgba(212,168,74,.22)">
+                      <span style="font-size:12.5px;color:#E2BE6A;font-weight:600">Lucro do mês</span>
+                      <span style="font-size:18px;font-weight:800;color:#FFFFFF;font-variant-numeric:tabular-nums">{{ t.lucroTxt }}</span>
+                    </div>
+                    <sc-if value="{{ t.hasWarn }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12.5px;color:#E6B547;font-weight:600">
+                        <span style="width:7px;height:7px;border-radius:50%;background:#E6B547"></span>{{ t.warnTxt }}
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ hasTruckDetail }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <button onClick="{{ closeTruck }}" style="display:flex;align-items:center;gap:7px;height:36px;padding:0 13px 0 9px;border-radius:9px;border:1px solid #262626;background:#141414;color:#B8B8B8;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:18px"><span style="display:flex;transform:rotate(180deg)">{{ I.arrowR }}</span>Voltar para a frota</button>
+              <sc-if value="{{ tdView }}" hint-placeholder-val="{{ false }}">
+                <div>
+                  <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+                    <span style="width:60px;height:60px;border-radius:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#1C1C1C;border:1px solid #262626;color:{{ tdView.cor }}">{{ tdView.icon }}</span>
+                    <div>
+                      <h1 style="margin:0;font-size:25px;font-weight:700;letter-spacing:-.02em;color:#FFFFFF">{{ tdView.nome }}</h1>
+                      <div style="display:flex;align-items:center;gap:10px;margin-top:5px;font-size:13px;color:#B8B8B8"><span style="font-family:'JetBrains Mono';color:#E2BE6A;font-weight:600">{{ tdView.placa }}</span><span style="color:#6E6E6E">·</span>{{ tdView.modelo }}</div>
+                    </div>
+                  </div>
+
+                  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px">
+                    <div style="background:#141414;border:1px solid #262626;border-radius:12px;padding:15px 18px">
+                      <div style="font-size:12.5px;color:#6E6E6E">Hodômetro</div>
+                      <div style="font-size:21px;font-weight:700;color:#FFFFFF;margin-top:4px;font-variant-numeric:tabular-nums">{{ tdView.hodTxt }}</div>
+                    </div>
+                    <div style="background:#141414;border:1px solid #262626;border-radius:12px;padding:15px 18px">
+                      <div style="font-size:12.5px;color:#6E6E6E">Custo por km</div>
+                      <div style="font-size:21px;font-weight:700;color:#FFFFFF;margin-top:4px;font-variant-numeric:tabular-nums">{{ tdView.custoTxt }}</div>
+                    </div>
+                    <div style="background:#141414;border:1px solid #262626;border-radius:12px;padding:15px 18px">
+                      <div style="font-size:12.5px;color:#6E6E6E">Lucro do mês</div>
+                      <div style="font-size:21px;font-weight:700;color:#4FCB8E;margin-top:4px;font-variant-numeric:tabular-nums">{{ tdView.lucroTxt }}</div>
+                    </div>
+                    <div style="background:rgba(212,168,74,.07);border:1px solid rgba(212,168,74,.24);border-radius:12px;padding:15px 18px">
+                      <div style="font-size:12.5px;color:#E2BE6A">Próxima manutenção</div>
+                      <div style="font-size:15px;font-weight:700;color:#FFFFFF;margin-top:4px">{{ tdView.prox }}</div>
+                      <div style="font-size:12px;color:#B8B8B8;margin-top:2px">{{ tdView.proxTxt }}</div>
+                    </div>
+                  </div>
+
+                  <div style="background:#141414;border:1px solid #262626;border-radius:14px;padding:18px 20px">
+                    <h3 style="margin:0 0 4px;font-size:16px;font-weight:700;color:#FFFFFF">Vencimentos e documentos</h3>
+                    <div style="font-size:13px;color:#6E6E6E;margin-bottom:16px">Licenciamento, seguro e ANTT · não deixe vencer</div>
+                    <div style="display:flex;flex-direction:column;gap:11px">
+                      <sc-for list="{{ tdView.venc }}" as="v" hint-placeholder-count="3">
+                        <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:11px;background:{{ v.bg }};border:1px solid {{ v.border }}">
+                          <span style="width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#1C1C1C;color:{{ v.iconFg }}">{{ v.icon }}</span>
+                          <div style="flex:1;min-width:0">
+                            <div style="font-size:14px;font-weight:600;color:#FFFFFF">{{ v.t }}</div>
+                            <div style="font-size:12.5px;color:#6E6E6E;margin-top:2px;font-family:'JetBrains Mono'">{{ v.d }} · {{ v.diasTxt }}</div>
+                          </div>
+                          <span style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;font-size:12px;font-weight:600;background:{{ v.statusBg }};color:{{ v.statusFg }}">{{ v.statusLabel }}</span>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <!-- ===== FINANCEIRO ===== -->
+      <sc-if value="{{ scFinanceiro }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="margin-bottom:18px">
+            <h1 style="margin:0;font-size:27px;font-weight:700;letter-spacing:-.02em;color:#FFFFFF">Financeiro</h1>
+            <p style="margin:5px 0 0;font-size:14px;color:#B8B8B8">O que entra e o que sai, organizado por vencimento.</p>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-bottom:18px;max-width:520px">
+            <button onClick="{{ setReceber }}" style="{{ finRecSty }}">{{ I.arrowUr }} A receber · {{ recTotTxt }}</button>
+            <button onClick="{{ setPagar }}" style="{{ finPagSty }}">{{ I.coin }} A pagar · {{ pagTotTxt }}</button>
+          </div>
+
+          <sc-if value="{{ isReceber }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <sc-for list="{{ receberGroups }}" as="g" hint-placeholder-count="3">
+                <div style="background:#141414;border:1px solid #262626;border-radius:14px;overflow:hidden">
+                  <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid #1A1A1A">
+                    <div style="display:flex;align-items:center;gap:9px;font-size:14px;font-weight:700;color:#FFFFFF"><span style="width:8px;height:8px;border-radius:50%;background:{{ g.dot }}"></span>{{ g.label }}</div>
+                    <div style="font-size:14px;font-weight:700;color:#FFFFFF;font-variant-numeric:tabular-nums">{{ g.totalTxt }}</div>
+                  </div>
+                  <sc-for list="{{ g.items }}" as="i" hint-placeholder-count="2">
+                    <div style="display:flex;align-items:center;gap:14px;padding:14px 20px;border-top:1px solid #1A1A1A">
+                      <span style="width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:rgba(79,203,142,.12);color:#4FCB8E">{{ I.arrowUr }}</span>
+                      <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#FFFFFF">{{ i.nome }}</div><div style="font-size:12px;color:#6E6E6E;margin-top:2px">{{ i.sub }}</div></div>
+                      <span style="font-size:12px;color:#6E6E6E;font-family:'JetBrains Mono'">{{ i.venc }}</span>
+                      <span style="font-size:14px;font-weight:700;color:#4FCB8E;font-variant-numeric:tabular-nums;min-width:108px;text-align:right">{{ i.valorTxt }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isPagar }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <sc-for list="{{ pagarGroups }}" as="g" hint-placeholder-count="2">
+                <div style="background:#141414;border:1px solid #262626;border-radius:14px;overflow:hidden">
+                  <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid #1A1A1A">
+                    <div style="display:flex;align-items:center;gap:9px;font-size:14px;font-weight:700;color:#FFFFFF"><span style="width:8px;height:8px;border-radius:50%;background:{{ g.dot }}"></span>{{ g.label }}</div>
+                    <div style="font-size:14px;font-weight:700;color:#FFFFFF;font-variant-numeric:tabular-nums">{{ g.totalTxt }}</div>
+                  </div>
+                  <sc-for list="{{ g.items }}" as="i" hint-placeholder-count="2">
+                    <div style="display:flex;align-items:center;gap:14px;padding:14px 20px;border-top:1px solid #1A1A1A">
+                      <span style="width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:rgba(224,112,138,.12);color:#E0708A">{{ I.coin }}</span>
+                      <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#FFFFFF">{{ i.nome }}</div><div style="font-size:12px;color:#6E6E6E;margin-top:2px">{{ i.sub }}</div></div>
+                      <span style="font-size:12px;color:#6E6E6E;font-family:'JetBrains Mono'">{{ i.venc }}</span>
+                      <span style="font-size:14px;font-weight:700;color:#FFFFFF;font-variant-numeric:tabular-nums;min-width:108px;text-align:right">{{ i.valorTxt }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+      <!-- ===== WHATSAPP ===== -->
+      <sc-if value="{{ scWhatsapp }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="margin-bottom:20px">
+            <h1 style="margin:0;font-size:27px;font-weight:700;letter-spacing:-.02em;color:#FFFFFF">WhatsApp</h1>
+            <p style="margin:5px 0 0;font-size:14px;color:#B8B8B8">Lance viagens e despesas mandando um áudio ou foto. A gente entende e você confirma.</p>
+          </div>
+
+          <div style="display:grid;grid-template-columns:362px 1fr;gap:24px;align-items:start">
+            <!-- phone -->
+            <div style="background:#0A0A0A;border:1px solid #2A2A2A;border-radius:34px;padding:11px;box-shadow:0 24px 60px rgba(0,0,0,.55)">
+              <div style="border-radius:24px;overflow:hidden;background:#0B141A">
+                <div style="display:flex;align-items:center;gap:11px;padding:13px 14px;background:#1F2C33">
+                  <span style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#ECD08C,#D4A84A 45%,#B89238);display:flex;align-items:center;justify-content:center;color:#0A0A0A">{{ I.route }}</span>
+                  <div style="line-height:1.25"><div style="font-size:14px;font-weight:700;color:#E9EDEF">GuinchoFin</div><div style="font-size:11.5px;color:#4FCB8E">online · assistente</div></div>
+                </div>
+                <div style="padding:16px 12px;display:flex;flex-direction:column;gap:10px;min-height:436px">
+                  <div style="align-self:flex-start;max-width:80%;background:#1F2C33;color:#E9EDEF;padding:9px 12px;border-radius:3px 13px 13px 13px;font-size:13px;line-height:1.45">Oi, Marcos! Manda um áudio contando a viagem que eu lanço pra você. 🚚<div style="font-size:10px;color:#7E9098;text-align:right;margin-top:3px">09:12</div></div>
+                  <div style="align-self:flex-end;max-width:84%;background:#005C4B;color:#E9EDEF;padding:10px 12px;border-radius:13px 3px 13px 13px;display:flex;align-items:center;gap:10px">
+                    <span style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#E9EDEF">{{ I.mic }}</span>
+                    <span style="display:flex;align-items:center;gap:2px;height:22px">
+                      <span style="width:2.5px;height:8px;background:#9FE3C9;border-radius:2px"></span><span style="width:2.5px;height:15px;background:#9FE3C9;border-radius:2px"></span><span style="width:2.5px;height:20px;background:#9FE3C9;border-radius:2px"></span><span style="width:2.5px;height:11px;background:#9FE3C9;border-radius:2px"></span><span style="width:2.5px;height:18px;background:#9FE3C9;border-radius:2px"></span><span style="width:2.5px;height:22px;background:#9FE3C9;border-radius:2px"></span><span style="width:2.5px;height:9px;background:#9FE3C9;border-radius:2px"></span><span style="width:2.5px;height:14px;background:#6FB39B;border-radius:2px"></span><span style="width:2.5px;height:19px;background:#6FB39B;border-radius:2px"></span><span style="width:2.5px;height:7px;background:#6FB39B;border-radius:2px"></span><span style="width:2.5px;height:13px;background:#6FB39B;border-radius:2px"></span><span style="width:2.5px;height:16px;background:#6FB39B;border-radius:2px"></span>
+                    </span>
+                    <span style="font-size:11px;color:#C9D6CF">0:09</span>
+                  </div>
+                  <div style="align-self:flex-start;max-width:88%;background:#1F2C33;color:#E9EDEF;padding:11px 12px;border-radius:3px 13px 13px 13px;width:88%">
+                    <div style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:#4FCB8E;margin-bottom:9px">{{ I.checkC }} Entendi uma viagem</div>
+                    <div style="background:#0B141A;border:1px solid #25343C;border-radius:10px;padding:11px 12px;display:flex;flex-direction:column;gap:7px;font-size:12.5px">
+                      <div style="display:flex;justify-content:space-between"><span style="color:#7E9098">Rota</span><span style="color:#E9EDEF;font-weight:600;text-align:right">Rib. Preto → Sertãozinho</span></div>
+                      <div style="display:flex;justify-content:space-between"><span style="color:#7E9098">Distância</span><span style="color:#E9EDEF;font-weight:600">38 km</span></div>
+                      <div style="display:flex;justify-content:space-between"><span style="color:#7E9098">Valor</span><span style="color:#E9EDEF;font-weight:700">R$ 520,00</span></div>
+                      <div style="display:flex;justify-content:space-between"><span style="color:#7E9098">Cliente</span><span style="color:#E9EDEF;font-weight:600">Porto Seguro</span></div>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-top:10px">
+                      <button onClick="{{ goWhats }}" style="flex:1;height:36px;border-radius:9px;border:none;background:#25D366;color:#062b18;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">{{ I.check }} Confirmar</button>
+                      <button style="flex:1;height:36px;border-radius:9px;border:1px solid #2F4048;background:transparent;color:#E9EDEF;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Corrigir</button>
+                    </div>
+                    <div style="font-size:10px;color:#7E9098;text-align:right;margin-top:7px">09:12</div>
+                  </div>
+                  <div style="align-self:flex-end;max-width:70%;background:#005C4B;color:#E9EDEF;padding:9px 12px;border-radius:13px 3px 13px 13px;font-size:13px">Lançado com sucesso. ✅<div style="font-size:10px;color:#C9D6CF;text-align:right;margin-top:3px">09:13</div></div>
+                </div>
+                <div style="display:flex;align-items:center;gap:9px;padding:10px 12px;background:#1F2C33">
+                  <div style="flex:1;height:38px;border-radius:999px;background:#2A3942;display:flex;align-items:center;padding:0 15px;font-size:13px;color:#7E9098">Mensagem</div>
+                  <span style="width:42px;height:42px;border-radius:50%;background:#25D366;display:flex;align-items:center;justify-content:center;color:#062b18;flex-shrink:0">{{ I.mic }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- status + how -->
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <div style="background:#141414;border:1px solid #262626;border-radius:14px;padding:18px 20px">
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <div style="display:flex;align-items:center;gap:11px">
+                    <span style="width:42px;height:42px;border-radius:11px;background:rgba(37,211,102,.14);display:flex;align-items:center;justify-content:center;color:#25D366">{{ I.message }}</span>
+                    <div>
+                      <div style="display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;color:#FFFFFF">Conectado<span style="width:8px;height:8px;border-radius:50%;background:#4FCB8E;box-shadow:0 0 8px rgba(79,203,142,.6)"></span></div>
+                      <div style="font-size:12.5px;color:#6E6E6E;margin-top:2px">Sincronizado há 2 minutos</div>
+                    </div>
+                  </div>
+                  <button style="height:36px;padding:0 14px;border-radius:9px;border:1px solid #262626;background:#1C1C1C;color:#B8B8B8;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Desconectar</button>
+                </div>
+                <div style="height:1px;background:#262626;margin:16px 0 14px"></div>
+                <div style="display:flex;gap:28px">
+                  <div><div style="font-size:12px;color:#6E6E6E">Número vinculado</div><div style="font-size:14px;font-weight:600;color:#FFFFFF;font-family:'JetBrains Mono';margin-top:3px">+55 16 99123-4567</div></div>
+                  <div><div style="font-size:12px;color:#6E6E6E">Lançamentos em junho</div><div style="font-size:14px;font-weight:700;color:#E2BE6A;margin-top:3px">23 por WhatsApp</div></div>
+                </div>
+              </div>
+
+              <div style="background:#141414;border:1px solid #262626;border-radius:14px;padding:18px 20px">
+                <h3 style="margin:0 0 16px;font-size:16px;font-weight:700;color:#FFFFFF">Como funciona</h3>
+                <div style="display:flex;flex-direction:column;gap:16px">
+                  <div style="display:flex;align-items:flex-start;gap:14px">
+                    <span style="width:36px;height:36px;border-radius:10px;background:rgba(232,154,106,.14);color:#E89A6A;display:flex;align-items:center;justify-content:center;flex-shrink:0">{{ I.mic }}</span>
+                    <div><div style="font-size:14px;font-weight:600;color:#FFFFFF">1. Mande áudio ou foto</div><div style="font-size:13px;color:#6E6E6E;margin-top:2px">Conte a viagem ou mande a foto do comprovante. Do seu jeito, sem formulário.</div></div>
+                  </div>
+                  <div style="display:flex;align-items:flex-start;gap:14px">
+                    <span style="width:36px;height:36px;border-radius:10px;background:rgba(212,168,74,.16);color:#E2BE6A;display:flex;align-items:center;justify-content:center;flex-shrink:0">{{ I.checkC }}</span>
+                    <div><div style="font-size:14px;font-weight:600;color:#FFFFFF">2. A gente interpreta</div><div style="font-size:13px;color:#6E6E6E;margin-top:2px">Rota, valor, km e cliente são preenchidos automaticamente.</div></div>
+                  </div>
+                  <div style="display:flex;align-items:flex-start;gap:14px">
+                    <span style="width:36px;height:36px;border-radius:10px;background:rgba(79,203,142,.14);color:#4FCB8E;display:flex;align-items:center;justify-content:center;flex-shrink:0">{{ I.check }}</span>
+                    <div><div style="font-size:14px;font-weight:600;color:#FFFFFF">3. Você confirma</div><div style="font-size:13px;color:#6E6E6E;margin-top:2px">Toca em Confirmar e pronto — já entra no seu financeiro.</div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ===== ONBOARDING ===== -->
+      <sc-if value="{{ scOnboarding }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:600px;margin:8px auto 0">
+          <div style="text-align:center;margin-bottom:26px">
+            <h1 style="margin:0;font-size:26px;font-weight:700;letter-spacing:-.02em;color:#FFFFFF">Bem-vindo ao GuinchoFin</h1>
+            <p style="margin:6px 0 0;font-size:14px;color:#B8B8B8">Em 3 passos rápidos você já começa a lançar.</p>
+          </div>
+
+          <div style="position:relative;max-width:480px;margin:0 auto 30px">
+            <div style="position:absolute;top:17px;left:40px;right:40px;height:2px;background:#262626"></div>
+            <div style="position:relative;display:flex;justify-content:space-between">
+              <sc-for list="{{ obSteps }}" as="s" hint-placeholder-count="3">
+                <div style="display:flex;flex-direction:column;align-items:center;gap:9px;background:#0A0A0A;padding:0 8px">
+                  <div style="{{ s.circleSty }}">
+                    <sc-if value="{{ s.done }}" hint-placeholder-val="{{ false }}">{{ s.check }}</sc-if>
+                    <sc-if value="{{ s.pending }}" hint-placeholder-val="{{ true }}">{{ s.num }}</sc-if>
+                  </div>
+                  <div style="font-size:12.5px;font-weight:600;color:{{ s.labelColor }};white-space:nowrap">{{ s.label }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="background:#141414;border:1px solid #262626;border-radius:16px;padding:26px 28px">
+            <!-- step 1 -->
+            <sc-if value="{{ isStep1 }}" hint-placeholder-val="{{ true }}">
+              <div>
+                <h3 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#FFFFFF">Criar sua conta</h3>
+                <p style="margin:0 0 20px;font-size:13.5px;color:#6E6E6E">Seus dados ficam guardados com segurança. Nada de papelada.</p>
+                <div style="display:flex;flex-direction:column;gap:14px">
+                  <div><div style="font-size:12.5px;font-weight:600;color:#B8B8B8;margin-bottom:6px">Seu nome</div><input value="Marcos Silva" style="width:100%;height:44px;padding:0 14px;border-radius:10px;border:1px solid #262626;background:#1C1C1C;color:#FFFFFF;font-family:inherit;font-size:14px;outline:none" /></div>
+                  <div><div style="font-size:12.5px;font-weight:600;color:#B8B8B8;margin-bottom:6px">WhatsApp (com DDD)</div><input value="(16) 99123-4567" style="width:100%;height:44px;padding:0 14px;border-radius:10px;border:1px solid #262626;background:#1C1C1C;color:#FFFFFF;font-family:'JetBrains Mono';font-size:14px;outline:none" /></div>
+                  <div><div style="font-size:12.5px;font-weight:600;color:#B8B8B8;margin-bottom:6px">Senha</div><input type="password" value="123456" style="width:100%;height:44px;padding:0 14px;border-radius:10px;border:1px solid #262626;background:#1C1C1C;color:#FFFFFF;font-family:inherit;font-size:14px;outline:none" /></div>
+                </div>
+              </div>
+            </sc-if>
+            <!-- step 2 -->
+            <sc-if value="{{ isStep2 }}" hint-placeholder-val="{{ false }}">
+              <div>
+                <h3 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#FFFFFF">Cadastrar seu primeiro caminhão</h3>
+                <p style="margin:0 0 20px;font-size:13.5px;color:#6E6E6E">Leva 1 minuto. Você pode adicionar os outros depois.</p>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+                  <div><div style="font-size:12.5px;font-weight:600;color:#B8B8B8;margin-bottom:6px">Placa</div><input value="PQR-2D34" style="width:100%;height:44px;padding:0 14px;border-radius:10px;border:1px solid #262626;background:#1C1C1C;color:#FFFFFF;font-family:'JetBrains Mono';font-size:14px;outline:none" /></div>
+                  <div><div style="font-size:12.5px;font-weight:600;color:#B8B8B8;margin-bottom:6px">Ano</div><input value="2014" style="width:100%;height:44px;padding:0 14px;border-radius:10px;border:1px solid #262626;background:#1C1C1C;color:#FFFFFF;font-family:'JetBrains Mono';font-size:14px;outline:none" /></div>
+                  <div style="grid-column:1/3"><div style="font-size:12.5px;font-weight:600;color:#B8B8B8;margin-bottom:6px">Modelo</div><input value="Mercedes-Benz 710 Plataforma" style="width:100%;height:44px;padding:0 14px;border-radius:10px;border:1px solid #262626;background:#1C1C1C;color:#FFFFFF;font-family:inherit;font-size:14px;outline:none" /></div>
+                  <div style="grid-column:1/3"><div style="font-size:12.5px;font-weight:600;color:#B8B8B8;margin-bottom:6px">Hodômetro atual</div><input value="284.350 km" style="width:100%;height:44px;padding:0 14px;border-radius:10px;border:1px solid #262626;background:#1C1C1C;color:#FFFFFF;font-family:'JetBrains Mono';font-size:14px;outline:none" /></div>
+                </div>
+              </div>
+            </sc-if>
+            <!-- step 3 -->
+            <sc-if value="{{ isStep3 }}" hint-placeholder-val="{{ false }}">
+              <div>
+                <h3 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#FFFFFF">Conectar o WhatsApp</h3>
+                <p style="margin:0 0 20px;font-size:13.5px;color:#6E6E6E">Escaneie o código e faça seu primeiro lançamento por áudio.</p>
+                <div style="display:flex;gap:22px;align-items:center">
+                  <div style="background:#FFFFFF;border-radius:14px;padding:14px;flex-shrink:0;box-shadow:0 8px 24px rgba(0,0,0,.4)">{{ qrSvg }}</div>
+                  <div>
+                    <div style="display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600;color:#FFFFFF;margin-bottom:14px">{{ I.phone }} Abra o WhatsApp e aponte a câmera</div>
+                    <div style="background:#1C1C1C;border:1px solid #262626;border-radius:12px;padding:13px 15px">
+                      <div style="font-size:11px;color:#6E6E6E;text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:8px">Depois é só mandar um áudio assim</div>
+                      <div style="font-size:13.5px;color:#E9EDEF;line-height:1.5;font-style:italic">"Fiz uma viagem de Ribeirão a Sertãozinho, 38 quilômetros, 520 reais, Porto Seguro."</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+
+            <div style="display:flex;align-items:center;gap:10px;margin-top:24px">
+              <sc-if value="{{ isStep1 }}" hint-placeholder-val="{{ true }}"><div style="flex:1"></div></sc-if>
+              <sc-if value="{{ isStep2 }}" hint-placeholder-val="{{ false }}"><button onClick="{{ obBack }}" style="height:46px;padding:0 20px;border-radius:11px;border:1px solid #262626;background:#1C1C1C;color:#FFFFFF;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Voltar</button><div style="flex:1"></div></sc-if>
+              <sc-if value="{{ isStep3 }}" hint-placeholder-val="{{ false }}"><button onClick="{{ obBack }}" style="height:46px;padding:0 20px;border-radius:11px;border:1px solid #262626;background:#1C1C1C;color:#FFFFFF;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Voltar</button><div style="flex:1"></div></sc-if>
+              <sc-if value="{{ isStep3 }}" hint-placeholder-val="{{ false }}"><button onClick="{{ obFinish }}" style="height:46px;padding:0 24px;border-radius:11px;border:none;background:linear-gradient(135deg,#ECD08C,#D4A84A 45%,#B89238);color:#0A0A0A;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(212,168,74,.2)">Ir para o início</button></sc-if>
+              <sc-if value="{{ isStep1 }}" hint-placeholder-val="{{ true }}"><button onClick="{{ obNext }}" style="height:46px;padding:0 24px;border-radius:11px;border:none;background:linear-gradient(135deg,#ECD08C,#D4A84A 45%,#B89238);color:#0A0A0A;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(212,168,74,.2)">Próximo</button></sc-if>
+              <sc-if value="{{ isStep2 }}" hint-placeholder-val="{{ false }}"><button onClick="{{ obNext }}" style="height:46px;padding:0 24px;border-radius:11px;border:none;background:linear-gradient(135deg,#ECD08C,#D4A84A 45%,#B89238);color:#0A0A0A;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(212,168,74,.2)">Próximo</button></sc-if>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+      <!--ANCHOR-SCREENS-->
+
+    </div>
+  </main>
+
+  <sc-if value="{{ showFab }}" hint-placeholder-val="{{ false }}">
+    <button onClick="{{ fabAction }}" style="position:fixed;bottom:28px;right:28px;z-index:30;height:56px;padding:0 24px;border-radius:999px;border:none;background:linear-gradient(135deg,#ECD08C,#D4A84A 45%,#B89238);color:#0A0A0A;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:9px;box-shadow:0 10px 30px rgba(212,168,74,.35)">{{ I.plus }}{{ fabLabel }}</button>
+  </sc-if>
+  <sc-if value="{{ modalOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeModal }}" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;padding:24px">
+
+      <sc-if value="{{ isViagemModal }}" hint-placeholder-val="{{ true }}">
+        <div onClick="{{ stopProp }}" style="width:520px;max-width:100%;max-height:calc(100vh - 48px);overflow-y:auto;background:#141414;border:1px solid #262626;border-radius:18px;animation:gfPop .2s cubic-bezier(.22,1,.36,1);box-shadow:0 24px 70px rgba(0,0,0,.6)">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 22px 16px;border-bottom:1px solid #262626">
+            <div>
+              <h3 style="margin:0;font-size:18px;font-weight:700;color:#FFFFFF">Nova viagem</h3>
+              <div style="font-size:12.5px;color:#6E6E6E;margin-top:2px">Preencha o essencial — leva 20 segundos</div>
+            </div>
+            <button onClick="{{ closeModal }}" style="width:36px;height:36px;border-radius:9px;border:1px solid #262626;background:#1C1C1C;color:#B8B8B8;cursor:pointer;display:flex;align-items:center;justify-content:center">{{ I.x }}</button>
+          </div>
+          <div style="padding:20px 22px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+              <div><div style="font-size:12.5px;font-weight:600;color:#B8B8B8;margin-bottom:6px">Origem</div><input placeholder="De onde saiu" style="width:100%;height:44px;padding:0 14px;border-radius:10px;border:1px solid #262626;background:#1C1C1C;color:#FFFFFF;font-family:inherit;font-size:14px;outline:none" /></div>
+              <div><div style="font-size:12.5px;font-weight:600;color:#B8B8B8;margin-bottom:6px">Destino</div><input placeholder="Para onde foi" style="width:100%;height:44px;padding:0 14px;border-radius:10px;border:1px solid #262626;background:#1C1C1C;color:#FFFFFF;font-family:inherit;font-size:14px;outline:none" /></div>
+              <div><div style="font-size:12.5px;font-weight:600;color:#B8B8B8;margin-bottom:6px">Distância (km)</div><input placeholder="0" style="width:100%;height:44px;padding:0 14px;border-radius:10px;border:1px solid #262626;background:#1C1C1C;color:#FFFFFF;font-family:'JetBrains Mono';font-size:14px;outline:none" /></div>
+              <div><div style="font-size:12.5px;font-weight:600;color:#B8B8B8;margin-bottom:6px">Valor (R$)</div><input placeholder="0,00" style="width:100%;height:44px;padding:0 14px;border-radius:10px;border:1px solid #262626;background:#1C1C1C;color:#FFFFFF;font-family:'JetBrains Mono';font-size:14px;outline:none" /></div>
+              <div style="grid-column:1/3"><div style="font-size:12.5px;font-weight:600;color:#B8B8B8;margin-bottom:6px">Cliente / seguradora</div><input placeholder="Ex: Porto Seguro" style="width:100%;height:44px;padding:0 14px;border-radius:10px;border:1px solid #262626;background:#1C1C1C;color:#FFFFFF;font-family:inherit;font-size:14px;outline:none" /></div>
+            </div>
+            <div style="font-size:12.5px;font-weight:600;color:#B8B8B8;margin:16px 0 8px">Caminhão</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <span style="height:38px;display:flex;align-items:center;padding:0 15px;border-radius:9px;border:1px solid #D4A84A;background:rgba(212,168,74,.12);color:#E2BE6A;font-size:13px;font-weight:600">MB 710</span>
+              <span style="height:38px;display:flex;align-items:center;padding:0 15px;border-radius:9px;border:1px solid #262626;background:#1C1C1C;color:#B8B8B8;font-size:13px;font-weight:600">VW 17.280</span>
+              <span style="height:38px;display:flex;align-items:center;padding:0 15px;border-radius:9px;border:1px solid #262626;background:#1C1C1C;color:#B8B8B8;font-size:13px;font-weight:600">Cargo 816</span>
+            </div>
+            <div style="font-size:12.5px;font-weight:600;color:#B8B8B8;margin:16px 0 8px">Status do pagamento</div>
+            <div style="display:flex;gap:8px">
+              <span style="flex:1;height:42px;display:flex;align-items:center;justify-content:center;gap:7px;border-radius:10px;border:1px solid #4FCB8E;background:rgba(79,203,142,.12);color:#4FCB8E;font-size:13.5px;font-weight:600"><span style="width:7px;height:7px;border-radius:50%;background:#4FCB8E"></span>Recebido</span>
+              <span style="flex:1;height:42px;display:flex;align-items:center;justify-content:center;gap:7px;border-radius:10px;border:1px solid #262626;background:#1C1C1C;color:#B8B8B8;font-size:13.5px;font-weight:600"><span style="width:7px;height:7px;border-radius:50%;background:#E6B547"></span>A receber</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;padding:0 22px 22px">
+            <button onClick="{{ closeModal }}" style="flex:1;height:46px;border-radius:11px;border:1px solid #262626;background:#1C1C1C;color:#FFFFFF;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Cancelar</button>
+            <button onClick="{{ saveModal }}" style="flex:2;height:46px;border-radius:11px;border:none;background:linear-gradient(135deg,#ECD08C,#D4A84A 45%,#B89238);color:#0A0A0A;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer">Salvar viagem</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isDespesaModal }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ stopProp }}" style="width:520px;max-width:100%;max-height:calc(100vh - 48px);overflow-y:auto;background:#141414;border:1px solid #262626;border-radius:18px;animation:gfPop .2s cubic-bezier(.22,1,.36,1);box-shadow:0 24px 70px rgba(0,0,0,.6)">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 22px 16px;border-bottom:1px solid #262626">
+            <div>
+              <h3 style="margin:0;font-size:18px;font-weight:700;color:#FFFFFF">Nova despesa</h3>
+              <div style="font-size:12.5px;color:#6E6E6E;margin-top:2px">Ou mande a foto do comprovante no WhatsApp</div>
+            </div>
+            <button onClick="{{ closeModal }}" style="width:36px;height:36px;border-radius:9px;border:1px solid #262626;background:#1C1C1C;color:#B8B8B8;cursor:pointer;display:flex;align-items:center;justify-content:center">{{ I.x }}</button>
+          </div>
+          <div style="padding:20px 22px">
+            <div style="font-size:12.5px;font-weight:600;color:#B8B8B8;margin-bottom:8px">Categoria</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <span style="height:38px;display:flex;align-items:center;gap:7px;padding:0 14px;border-radius:9px;border:1px solid #D4A84A;background:rgba(212,168,74,.12);color:#E2BE6A;font-size:13px;font-weight:600">Combustível</span>
+              <span style="height:38px;display:flex;align-items:center;padding:0 14px;border-radius:9px;border:1px solid #262626;background:#1C1C1C;color:#B8B8B8;font-size:13px;font-weight:600">Pedágio</span>
+              <span style="height:38px;display:flex;align-items:center;padding:0 14px;border-radius:9px;border:1px solid #262626;background:#1C1C1C;color:#B8B8B8;font-size:13px;font-weight:600">Manutenção</span>
+              <span style="height:38px;display:flex;align-items:center;padding:0 14px;border-radius:9px;border:1px solid #262626;background:#1C1C1C;color:#B8B8B8;font-size:13px;font-weight:600">Pneus</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px">
+              <div style="grid-column:1/3"><div style="font-size:12.5px;font-weight:600;color:#B8B8B8;margin-bottom:6px">Descrição</div><input placeholder="Ex: Diesel S10 — Posto Graal" style="width:100%;height:44px;padding:0 14px;border-radius:10px;border:1px solid #262626;background:#1C1C1C;color:#FFFFFF;font-family:inherit;font-size:14px;outline:none" /></div>
+              <div><div style="font-size:12.5px;font-weight:600;color:#B8B8B8;margin-bottom:6px">Valor (R$)</div><input placeholder="0,00" style="width:100%;height:44px;padding:0 14px;border-radius:10px;border:1px solid #262626;background:#1C1C1C;color:#FFFFFF;font-family:'JetBrains Mono';font-size:14px;outline:none" /></div>
+              <div><div style="font-size:12.5px;font-weight:600;color:#B8B8B8;margin-bottom:6px">Data</div><input value="11/06/2026" style="width:100%;height:44px;padding:0 14px;border-radius:10px;border:1px solid #262626;background:#1C1C1C;color:#FFFFFF;font-family:'JetBrains Mono';font-size:14px;outline:none" /></div>
+            </div>
+            <div style="margin-top:16px;border:1px dashed #353535;border-radius:12px;padding:18px;display:flex;align-items:center;gap:13px;cursor:pointer">
+              <span style="width:42px;height:42px;border-radius:11px;background:rgba(125,160,232,.14);color:#7DA0E8;display:flex;align-items:center;justify-content:center;flex-shrink:0">{{ I.camera }}</span>
+              <div><div style="font-size:13.5px;font-weight:600;color:#FFFFFF">Anexar comprovante</div><div style="font-size:12.5px;color:#6E6E6E;margin-top:1px">Tire uma foto da nota — a miniatura aparece na lista</div></div>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;padding:0 22px 22px">
+            <button onClick="{{ closeModal }}" style="flex:1;height:46px;border-radius:11px;border:1px solid #262626;background:#1C1C1C;color:#FFFFFF;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Cancelar</button>
+            <button onClick="{{ saveModal }}" style="flex:2;height:46px;border-radius:11px;border:none;background:linear-gradient(135deg,#ECD08C,#D4A84A 45%,#B89238);color:#0A0A0A;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer">Salvar despesa</button>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    screen: 'inicio',
+    truckDetail: null,
+    vStatus: 'todos',
+    vTruck: 'todos',
+    dCat: 'todas',
+    finTab: 'receber',
+    modal: null,
+    step: 1,
+    viagens: [
+      { id:'v1', data:'10/06', origem:'Ribeirão Preto, SP', destino:'Sertãozinho, SP', km:38, valor:520, cliente:'Porto Seguro', tipo:'seguradora', status:'receber', truck:'mb710', src:'whatsapp' },
+      { id:'v2', data:'09/06', origem:'Cravinhos, SP', destino:'Ribeirão Preto, SP', km:24, valor:340, cliente:'Particular — João M.', tipo:'particular', status:'recebido', truck:'ford816', src:'manual' },
+      { id:'v3', data:'08/06', origem:'Jardinópolis, SP', destino:'Batatais, SP', km:52, valor:680, cliente:'Azul Seguros', tipo:'seguradora', status:'receber', truck:'vw17', src:'whatsapp' },
+      { id:'v4', data:'07/06', origem:'Ribeirão Preto, SP', destino:'Franca, SP', km:96, valor:1180, cliente:'Tokio Marine', tipo:'seguradora', status:'recebido', truck:'vw17', src:'whatsapp' },
+      { id:'v5', data:'06/06', origem:'Bonfim Paulista, SP', destino:'Ribeirão Preto, SP', km:18, valor:260, cliente:'Particular — Cleide R.', tipo:'particular', status:'recebido', truck:'ford816', src:'manual' },
+      { id:'v6', data:'05/06', origem:'Serrana, SP', destino:'Ribeirão Preto, SP', km:33, valor:450, cliente:'Porto Seguro', tipo:'seguradora', status:'receber', truck:'mb710', src:'whatsapp' },
+      { id:'v7', data:'04/06', origem:'Ribeirão Preto, SP', destino:'São Carlos, SP', km:92, valor:1120, cliente:'Allianz', tipo:'seguradora', status:'recebido', truck:'vw17', src:'whatsapp' },
+      { id:'v8', data:'03/06', origem:'Dumont, SP', destino:'Ribeirão Preto, SP', km:27, valor:380, cliente:'Particular — Edson F.', tipo:'particular', status:'recebido', truck:'mb710', src:'manual' }
+    ],
+    despesas: [
+      { id:'d1', data:'10/06', cat:'combustivel', desc:'Diesel S10 — Posto Graal', valor:640, truck:'vw17', src:'foto' },
+      { id:'d2', data:'09/06', cat:'pedagio', desc:'Pedágio Anhanguera', valor:38.60, truck:'mb710', src:'whatsapp' },
+      { id:'d3', data:'08/06', cat:'manutencao', desc:'Troca de óleo + filtros', valor:520, truck:'mb710', src:'foto' },
+      { id:'d4', data:'07/06', cat:'pneus', desc:'2 pneus 295/80 recapados', valor:1680, truck:'vw17', src:'manual' },
+      { id:'d5', data:'05/06', cat:'combustivel', desc:'Diesel S10 — Posto BR', valor:580, truck:'ford816', src:'foto' },
+      { id:'d6', data:'03/06', cat:'seguro', desc:'Parcela seguro da frota (3/12)', valor:890, truck:'todos', src:'manual' },
+      { id:'d7', data:'02/06', cat:'parcela', desc:'Financiamento MB 710 (18/48)', valor:2340, truck:'mb710', src:'manual' },
+      { id:'d8', data:'01/06', cat:'motorista', desc:'Diária ajudante — Wesley', valor:180, truck:'vw17', src:'manual' }
+    ]
+  };
+
+  icons = {
+    'home':'<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
+    'truck':'<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+    'fuel':'<line x1="3" x2="15" y1="22" y2="22"/><line x1="4" x2="14" y1="9" y2="9"/><path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18"/><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2a2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"/>',
+    'wallet':'<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+    'banknote':'<rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>',
+    'message':'<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+    'bell':'<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
+    'search':'<path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/>',
+    'plus':'<path d="M5 12h14"/><path d="M12 5v14"/>',
+    'arrow-ur':'<path d="M7 7h10v10"/><path d="M7 17 17 7"/>',
+    'arrow-r':'<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+    'wrench':'<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+    'calendar':'<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
+    'chev-r':'<path d="m9 18 6-6-6-6"/>',
+    'chev-d':'<path d="m6 9 6 6 6-6"/>',
+    'logout':'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+    'alert':'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+    'gauge':'<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>',
+    'check':'<path d="M20 6 9 17l-5-5"/>',
+    'check-c':'<path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/>',
+    'mic':'<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/>',
+    'camera':'<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
+    'shield':'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+    'card':'<rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/>',
+    'user':'<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    'coin':'<circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/>',
+    'up':'<path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/>',
+    'down':'<path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/>',
+    'settings':'<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+    'filter':'<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>',
+    'image':'<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+    'clock':'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+    'phone':'<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>',
+    'route':'<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>',
+    'x':'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+    'more':'<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+    'link':'<path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/>',
+    'tire':'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/>',
+    'pin':'<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
+    'play':'<polygon points="6 3 20 12 6 21 6 3"/>',
+    'doc':'<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h6"/>'
+  };
+
+  ic(name, size, stroke) {
+    return React.createElement('svg', { width: size||18, height: size||18, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth: stroke||1.75, strokeLinecap:'round', strokeLinejoin:'round', style:{display:'block',flexShrink:0}, dangerouslySetInnerHTML:{__html: this.icons[name]||''} });
+  }
+  brl(v){ return 'R$\u00a0' + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}); }
+  brl0(v){ return 'R$\u00a0' + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:0, maximumFractionDigits:0}); }
+
+  go(s){ this.setState({ screen:s, truckDetail:null, modal:null }); window.scrollTo(0,0); }
+
+  trucks(){ return [
+    { id:'mb710', nome:'Mercedes-Benz 710', apelido:'MB 710', placa:'PQR-2D34', modelo:'710 · Plataforma', cor:'#E6B547', hod:284350, lucro:8420, custoKm:2.18, prox:'Troca de óleo', proxKm:800,
+      venc:[ {t:'Licenciamento', d:'15/07/2026', dias:34, st:'ok'}, {t:'Seguro (apólice)', d:'02/07/2026', dias:21, st:'warn'}, {t:'ANTT · RNTRC', d:'28/06/2026', dias:17, st:'warn'} ] },
+    { id:'vw17', nome:'VW Constellation 17.280', apelido:'VW 17.280', placa:'RST-5E67', modelo:'17.280 · Guincho pesado', cor:'#7DA0E8', hod:412080, lucro:11240, custoKm:2.64, prox:'Revisão de freios', proxKm:2300,
+      venc:[ {t:'Licenciamento', d:'30/06/2026', dias:19, st:'warn'}, {t:'Seguro (apólice)', d:'21/09/2026', dias:102, st:'ok'}, {t:'ANTT · RNTRC', d:'10/08/2026', dias:60, st:'ok'} ] },
+    { id:'ford816', nome:'Ford Cargo 816', apelido:'Cargo 816', placa:'UVW-8H90', modelo:'Cargo 816 · Plataforma', cor:'#4FCB8E', hod:158920, lucro:4960, custoKm:1.92, prox:'Troca de pneus', proxKm:5400,
+      venc:[ {t:'Licenciamento', d:'22/12/2026', dias:194, st:'ok'}, {t:'Seguro (apólice)', d:'05/07/2026', dias:24, st:'warn'}, {t:'ANTT · RNTRC', d:'15/11/2026', dias:157, st:'ok'} ] }
+  ]; }
+  truckName(id){ const t = this.trucks().find(x=>x.id===id); return t? t.apelido : '—'; }
+
+  catMeta(){ return {
+    combustivel:{ label:'Combustível', icon:'fuel', bg:'rgba(232,154,106,.15)', fg:'#E89A6A' },
+    pedagio:{ label:'Pedágio', icon:'route', bg:'rgba(125,160,232,.15)', fg:'#7DA0E8' },
+    manutencao:{ label:'Manutenção', icon:'wrench', bg:'rgba(230,181,71,.15)', fg:'#E6B547' },
+    pneus:{ label:'Pneus', icon:'tire', bg:'rgba(79,203,142,.15)', fg:'#4FCB8E' },
+    seguro:{ label:'Seguro', icon:'shield', bg:'rgba(178,148,232,.15)', fg:'#B294E8' },
+    parcela:{ label:'Parcela', icon:'card', bg:'rgba(224,112,138,.15)', fg:'#E0708A' },
+    motorista:{ label:'Motorista', icon:'user', bg:'rgba(125,160,232,.15)', fg:'#7DA0E8' }
+  }; }
+  srcBadge(src){
+    if(src==='whatsapp') return { label:'WhatsApp', icon:'message', bg:'rgba(79,203,142,.14)', fg:'#4FCB8E' };
+    if(src==='foto') return { label:'Foto', icon:'camera', bg:'rgba(125,160,232,.14)', fg:'#7DA0E8' };
+    return { label:'Manual', icon:'user', bg:'#1C1C1C', fg:'#B8B8B8' };
+  }
+
+  navStyle(active){
+    const base = 'display:flex;align-items:center;gap:11px;padding:9px 11px;margin:2px 0;border-radius:9px;font-size:13.5px;font-weight:500;cursor:pointer;text-decoration:none;position:relative;transition:all .12s cubic-bezier(.22,1,.36,1)';
+    return base + (active
+      ? ';background:#141414;color:#FFFFFF;font-weight:600;box-shadow:inset 0 0 0 1px #262626'
+      : ';background:transparent;color:#B8B8B8');
+  }
+  makeQR(){
+    const n=21, on=[];
+    const seed=(x,y)=>((x*73856093 ^ y*19349663 ^ (x*y+7)*83492791)>>>0)%100;
+    for(let y=0;y<n;y++) for(let x=0;x<n;x++){
+      const inFinder=(x<8&&y<8)||(x>n-9&&y<8)||(x<8&&y>n-9);
+      if(inFinder) continue;
+      if(seed(x,y)<46) on.push([x,y]);
+    }
+    const finder=(ox,oy)=>{ for(let y=0;y<7;y++) for(let x=0;x<7;x++){ const edge=(x===0||x===6||y===0||y===6); const core=(x>=2&&x<=4&&y>=2&&y<=4); if(edge||core) on.push([ox+x,oy+y]); } };
+    finder(0,0); finder(n-7,0); finder(0,n-7);
+    const s=7;
+    const rects=on.map((c,i)=>React.createElement('rect',{key:i,x:c[0]*s,y:c[1]*s,width:s,height:s,fill:'#0A0A0A'}));
+    return React.createElement('svg',{width:n*s,height:n*s,viewBox:'0 0 '+(n*s)+' '+(n*s),style:{display:'block'}},rects);
+  }
+  chipStyle(active){
+    return 'display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 15px;border-radius:9px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .12s cubic-bezier(.22,1,.36,1);border:1px solid '+(active?'#D4A84A':'#262626')+';background:'+(active?'rgba(212,168,74,.12)':'#141414')+';color:'+(active?'#E2BE6A':'#B8B8B8');
+  }
+
+  renderVals(){
+    const S = this.state;
+    const trucks = this.trucks();
+    const CAT = this.catMeta();
+    const gold = 'linear-gradient(135deg,#ECD08C,#D4A84A 45%,#B89238)';
+
+    // ---- NAV ----
+    const navDef = [
+      { id:'inicio', label:'Início', icon:'home' },
+      { id:'viagens', label:'Viagens', icon:'route' },
+      { id:'despesas', label:'Despesas', icon:'wallet' },
+      { id:'caminhoes', label:'Caminhões', icon:'truck' },
+      { id:'financeiro', label:'Financeiro', icon:'banknote' }
+    ];
+    const nav = navDef.map(n => ({
+      label:n.label, onClick:()=>this.go(n.id), active:S.screen===n.id,
+      style:this.navStyle(S.screen===n.id),
+      icon:this.ic(n.icon,18), iconColor:S.screen===n.id?'#D4A84A':'#6E6E6E'
+    }));
+    const navWa = { onClick:()=>this.go('whatsapp'), active:S.screen==='whatsapp', style:this.navStyle(S.screen==='whatsapp'), icon:this.ic('message',18), iconColor:S.screen==='whatsapp'?'#D4A84A':'#6E6E6E' };
+    const navOn = { onClick:()=>this.go('onboarding'), active:S.screen==='onboarding', style:this.navStyle(S.screen==='onboarding'), icon:this.ic('play',16), iconColor:S.screen==='onboarding'?'#D4A84A':'#6E6E6E' };
+
+    // ---- DASHBOARD ----
+    const alertsRaw = [
+      { tone:'gold', icon:'wrench', titulo:'Troca de óleo · Mercedes-Benz 710', sub:'Faltam aprox. 800 km — agende para esta semana' },
+      { tone:'warn', icon:'alert', titulo:'Licenciamento do VW 17.280 vence em 19 dias', sub:'Vencimento 30/06 · regularize para evitar multa' }
+    ];
+    const alerts = alertsRaw.map(a => ({
+      titulo:a.titulo, sub:a.sub, icon:this.ic(a.icon,18),
+      bg: a.tone==='gold' ? 'rgba(212,168,74,.08)' : 'rgba(230,181,71,.09)',
+      border: a.tone==='gold' ? 'rgba(212,168,74,.32)' : 'rgba(230,181,71,.30)',
+      iconBg: a.tone==='gold' ? 'rgba(212,168,74,.16)' : 'rgba(230,181,71,.16)',
+      iconFg: a.tone==='gold' ? '#E2BE6A' : '#E6B547'
+    }));
+
+    const statsRaw = [
+      { label:'Faturamento', val:38940, icon:'coin', bg:'rgba(212,168,74,.16)', fg:'#E2BE6A', delta:'+5,2%', tone:'pos', sub:'vs. maio', color:'#E2BE6A',
+        line:'M0 40 C30 36,50 42,80 34 S140 20,180 26 S230 10,260 14', fill:'M0 40 C30 36,50 42,80 34 S140 20,180 26 S230 10,260 14 L260 56 L0 56 Z' },
+      { label:'Despesas', val:14280, icon:'fuel', bg:'rgba(224,112,138,.15)', fg:'#E0708A', delta:'+1,8%', tone:'neutral', sub:'vs. maio', color:'#E0708A',
+        line:'M0 30 C30 34,60 28,90 32 S150 40,190 34 S240 38,260 30', fill:'M0 30 C30 34,60 28,90 32 S150 40,190 34 S240 38,260 30 L260 56 L0 56 Z' },
+      { label:'Lucro', val:24660, icon:'up', bg:'rgba(79,203,142,.15)', fg:'#4FCB8E', delta:'+7,9%', tone:'pos', sub:'vs. maio', color:'#4FCB8E',
+        line:'M0 46 C40 40,70 38,110 30 S180 16,260 10', fill:'M0 46 C40 40,70 38,110 30 S180 16,260 10 L260 56 L0 56 Z' },
+      { label:'A receber', val:9120, icon:'clock', bg:'rgba(125,160,232,.15)', fg:'#7DA0E8', delta:'4 faturas', tone:'info', sub:'seguradoras', color:'#7DA0E8',
+        line:'M0 24 C40 28,70 22,110 28 S180 38,260 42', fill:'M0 24 C40 28,70 22,110 28 S180 38,260 42 L260 56 L0 56 Z' }
+    ];
+    const stats = statsRaw.map(s => {
+      const dc = s.tone==='pos' ? '#4FCB8E' : (s.tone==='neg' ? '#E0708A' : '#6E6E6E');
+      return { label:s.label, valTxt:this.brl0(s.val), icon:this.ic(s.icon,18), iconBg:s.bg, iconFg:s.fg,
+        delta:s.delta, deltaColor:dc, sub:s.sub, color:s.color, line:s.line, fill:s.fill,
+        hasArrow:s.tone==='pos'||s.tone==='neg', arrow:this.ic(s.tone==='neg'?'down':'up',13) };
+    });
+
+    const ranking = trucks.slice().sort((a,b)=>b.lucro-a.lucro);
+    const maxLucro = Math.max.apply(null, ranking.map(t=>t.lucro));
+    const rankView = ranking.map(t => ({ nome:t.nome, apelido:t.apelido, cor:t.cor, lucroTxt:this.brl0(t.lucro), pct:Math.round(t.lucro/maxLucro*100), custoTxt:'R$\u00a0'+t.custoKm.toFixed(2).replace('.',',')+'/km' }));
+
+    const recentRaw = [
+      { data:'10/06', tipo:'viagem', titulo:'Ribeirão Preto → Sertãozinho', sub:'Porto Seguro · MB 710', valor:520, pos:true, src:'whatsapp' },
+      { data:'10/06', tipo:'despesa', titulo:'Diesel S10 — Posto Graal', sub:'Combustível · VW 17.280', valor:640, pos:false, src:'foto' },
+      { data:'09/06', tipo:'viagem', titulo:'Cravinhos → Ribeirão Preto', sub:'Particular · Cargo 816', valor:340, pos:true, src:'manual' },
+      { data:'09/06', tipo:'despesa', titulo:'Pedágio Anhanguera', sub:'Pedágio · MB 710', valor:38.60, pos:false, src:'whatsapp' },
+      { data:'08/06', tipo:'viagem', titulo:'Jardinópolis → Batatais', sub:'Azul Seguros · VW 17.280', valor:680, pos:true, src:'whatsapp' },
+      { data:'08/06', tipo:'despesa', titulo:'Troca de óleo + filtros', sub:'Manutenção · MB 710', valor:520, pos:false, src:'foto' }
+    ];
+    const recent = recentRaw.map(r => {
+      const sb = this.srcBadge(r.src);
+      return { data:r.data, titulo:r.titulo, sub:r.sub,
+        valorTxt:(r.pos?'+ ':'– ')+this.brl(r.valor), valorColor:r.pos?'#4FCB8E':'#E0708A',
+        icon:this.ic(r.tipo==='viagem'?'route':'wallet',16), iconBg:r.pos?'rgba(212,168,74,.14)':'rgba(224,112,138,.13)', iconFg:r.pos?'#E2BE6A':'#E0708A',
+        srcLabel:sb.label, srcIcon:this.ic(sb.icon,12,2), srcBg:sb.bg, srcFg:sb.fg };
+    });
+
+    // ---- VIAGENS ----
+    const vStatusOpts = [ {id:'todos',label:'Todas'}, {id:'recebido',label:'Recebidas'}, {id:'receber',label:'A receber'} ];
+    const vStatusChips = vStatusOpts.map(o => ({ label:o.label, active:S.vStatus===o.id, onClick:()=>this.setState({vStatus:o.id}), style:this.chipStyle(S.vStatus===o.id) }));
+    const vTruckOpts = [ {id:'todos',label:'Todos'} ].concat(trucks.map(t=>({id:t.id,label:t.apelido})));
+    const vTruckChips = vTruckOpts.map(o => ({ label:o.label, active:S.vTruck===o.id, onClick:()=>this.setState({vTruck:o.id}), style:this.chipStyle(S.vTruck===o.id) }));
+    const vfilt = S.viagens.filter(v => (S.vStatus==='todos'||v.status===S.vStatus) && (S.vTruck==='todos'||v.truck===S.vTruck));
+    const viagensView = vfilt.map(v => { const sb=this.srcBadge(v.src); const rec=v.status==='recebido'; return {
+      data:v.data, origem:v.origem, destino:v.destino, kmTxt:v.km+' km', valorTxt:this.brl(v.valor), cliente:v.cliente,
+      tipoLabel:v.tipo==='seguradora'?'Seguradora':'Particular', truck:this.truckName(v.truck),
+      statusLabel:rec?'Recebido':'A receber', statusBg:rec?'rgba(79,203,142,.13)':'rgba(230,181,71,.13)', statusFg:rec?'#4FCB8E':'#E6B547',
+      srcLabel:sb.label, srcIcon:this.ic(sb.icon,12,2), srcBg:sb.bg, srcFg:sb.fg, clienteIcon:this.ic(v.tipo==='seguradora'?'shield':'user',13,2) }; });
+    const vTotFat = vfilt.reduce((a,v)=>a+v.valor,0);
+    const vTotRec = vfilt.filter(v=>v.status==='receber').reduce((a,v)=>a+v.valor,0);
+
+    // ---- DESPESAS ----
+    const dCatOpts = [ {id:'todas',label:'Todas'} ].concat(Object.keys(CAT).map(k=>({id:k,label:CAT[k].label})));
+    const dCatChips = dCatOpts.map(o => ({ label:o.label, active:S.dCat===o.id, onClick:()=>this.setState({dCat:o.id}), style:this.chipStyle(S.dCat===o.id) }));
+    const dfilt = S.despesas.filter(d => S.dCat==='todas'||d.cat===S.dCat);
+    const despesasView = dfilt.map(d => { const m=CAT[d.cat]; const sb=this.srcBadge(d.src); return {
+      data:d.data, desc:d.desc, catLabel:m.label, icon:this.ic(m.icon,18), iconBg:m.bg, iconFg:m.fg,
+      valorTxt:this.brl(d.valor), truck:d.truck==='todos'?'Frota':this.truckName(d.truck), foto:d.src==='foto',
+      srcLabel:sb.label, srcIcon:this.ic(sb.icon,12,2), srcBg:sb.bg, srcFg:sb.fg }; });
+    const dTot = dfilt.reduce((a,d)=>a+d.valor,0);
+
+    // ---- CAMINHÕES ----
+    const trucksView = trucks.map(t => { const warns=t.venc.filter(v=>v.st==='warn').length; return {
+      nome:t.nome, apelido:t.apelido, placa:t.placa, modelo:t.modelo, cor:t.cor,
+      hodTxt:t.hod.toLocaleString('pt-BR')+' km', lucroTxt:this.brl0(t.lucro), custoTxt:'R$\u00a0'+t.custoKm.toFixed(2).replace('.',',')+'/km',
+      prox:t.prox, proxTxt:'em '+t.proxKm.toLocaleString('pt-BR')+' km', warns, hasWarn:warns>0,
+      warnTxt:warns+(warns===1?' vencimento próximo':' vencimentos próximos'), onClick:()=>this.setState({truckDetail:t.id}), icon:this.ic('truck',22,1.8) }; });
+    const td = S.truckDetail ? trucks.find(t=>t.id===S.truckDetail) : null;
+    let tdView = null;
+    if(td){ tdView = { nome:td.nome, apelido:td.apelido, placa:td.placa, modelo:td.modelo, cor:td.cor,
+      hodTxt:td.hod.toLocaleString('pt-BR')+' km', lucroTxt:this.brl0(td.lucro), custoTxt:'R$\u00a0'+td.custoKm.toFixed(2).replace('.',',')+'/km',
+      prox:td.prox, proxTxt:'em '+td.proxKm.toLocaleString('pt-BR')+' km', icon:this.ic('truck',26,1.8),
+      venc: td.venc.map(v => ({ t:v.t, d:v.d, diasTxt:'em '+v.dias+' dias',
+        bg:v.st==='warn'?'rgba(230,181,71,.09)':'#141414', border:v.st==='warn'?'rgba(230,181,71,.28)':'#262626',
+        icon:this.ic(v.t.indexOf('Seguro')>=0?'shield':(v.t.indexOf('ANTT')>=0?'doc':'calendar'),18), iconFg:v.st==='warn'?'#E6B547':'#6E6E6E',
+        statusLabel:v.st==='warn'?'Vence em breve':'Em dia', statusBg:v.st==='warn'?'rgba(230,181,71,.14)':'rgba(79,203,142,.13)', statusFg:v.st==='warn'?'#E6B547':'#4FCB8E' })) }; }
+
+    // ---- FINANCEIRO ----
+    const receberRaw = [
+      { label:'Vence em até 7 dias', tone:'warn', items:[ {nome:'Particular — Edson F.', sub:'Viagem 03/06 · Dumont → RP', valor:380, venc:'12/06'} ] },
+      { label:'8 a 30 dias', tone:'normal', items:[ {nome:'Particular — Cleide R.', sub:'Reboque avulso · oficina', valor:540, venc:'27/06'} ] },
+      { label:'30 a 60 dias · Seguradoras', tone:'gold', items:[
+        {nome:'Porto Seguro', sub:'2 viagens · NF 1042', valor:970, venc:'10/07'},
+        {nome:'Azul Seguros', sub:'1 viagem · NF 1043', valor:680, venc:'18/07'},
+        {nome:'Tokio Marine', sub:'1 viagem · NF 1039', valor:1180, venc:'24/07'} ] }
+    ];
+    const pagarRaw = [
+      { label:'Esta semana', tone:'warn', items:[
+        {nome:'Financiamento MB 710', sub:'Parcela 18/48', valor:2340, venc:'13/06'},
+        {nome:'Diesel — Posto Graal', sub:'Fatura quinzenal', valor:1220, venc:'15/06'} ] },
+      { label:'Próximas 2 semanas', tone:'normal', items:[
+        {nome:'Seguro da frota', sub:'Parcela 3/12', valor:890, venc:'20/06'},
+        {nome:'Recapagem de pneus', sub:'Borracharia Central', valor:1680, venc:'24/06'} ] }
+    ];
+    const mapFin = (arr) => arr.map(g => ({ label:g.label, gold:g.tone==='gold',
+      totalTxt:this.brl0(g.items.reduce((a,i)=>a+i.valor,0)),
+      dot:g.tone==='gold'?'#E2BE6A':(g.tone==='warn'?'#E6B547':'#7DA0E8'),
+      items:g.items.map(i => ({ nome:i.nome, sub:i.sub, valorTxt:this.brl(i.valor), venc:'vence '+i.venc, gold:g.tone==='gold' })) }));
+    const receberGroups = mapFin(receberRaw), pagarGroups = mapFin(pagarRaw);
+    const recTot = receberRaw.reduce((a,g)=>a+g.items.reduce((b,i)=>b+i.valor,0),0);
+    const pagTot = pagarRaw.reduce((a,g)=>a+g.items.reduce((b,i)=>b+i.valor,0),0);
+    const isReceber = S.finTab==='receber';
+    const finTabSty = (on) => 'flex:1;display:flex;align-items:center;justify-content:center;gap:8px;height:44px;border-radius:10px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:all .12s;border:1px solid '+(on?'#D4A84A':'#262626')+';background:'+(on?'rgba(212,168,74,.12)':'#141414')+';color:'+(on?'#E2BE6A':'#B8B8B8');
+
+    // ---- ONBOARDING ----
+    const obDef = [ {n:1,label:'Criar conta'}, {n:2,label:'Cadastrar caminhão'}, {n:3,label:'Conectar WhatsApp'} ];
+    const obSteps = obDef.map(o => { const state = o.n<S.step?'done':(o.n===S.step?'active':'todo'); return {
+      label:o.label, done:state==='done', active:state==='active', pending:state!=='done',
+      circleSty:'width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0;transition:all .15s;'+(state==='todo'?'background:#1C1C1C;color:#6E6E6E;border:1px solid #262626':'background:linear-gradient(135deg,#ECD08C,#D4A84A 45%,#B89238);color:#0A0A0A'),
+      labelColor: state==='todo'?'#6E6E6E':'#FFFFFF', num:String(o.n), check:this.ic('check',16,2.4) }; });
+
+    // ---- MODALS / FAB ----
+    const showFab = S.screen==='viagens' || S.screen==='despesas';
+
+    // chrome icons
+    const I = {
+      search:this.ic('search',16), bell:this.ic('bell',18), plus:this.ic('plus',16),
+      filter:this.ic('filter',13,2), chev:this.ic('chev-d',15), logout:this.ic('logout',16),
+      message:this.ic('message',14,2), arrowR:this.ic('arrow-r',15), arrowUr:this.ic('arrow-ur',16),
+      x:this.ic('x',18), check:this.ic('check',15,2.2), checkC:this.ic('check-c',16), pin:this.ic('pin',14,2),
+      mic:this.ic('mic',16), camera:this.ic('camera',15,2), image:this.ic('image',16), clock:this.ic('clock',13,2),
+      calendar:this.ic('calendar',15), chevR:this.ic('chev-r',16), link:this.ic('link',16), phone:this.ic('phone',16),
+      route:this.ic('route',15), coin:this.ic('coin',16), shield:this.ic('shield',14,2), gauge:this.ic('gauge',16)
+    };
+
+    return {
+      nav, navWa, navOn, gold,
+      // screen flags
+      scInicio:S.screen==='inicio', scViagens:S.screen==='viagens', scDespesas:S.screen==='despesas',
+      scCaminhoes:S.screen==='caminhoes', scFinanceiro:S.screen==='financeiro', scWhatsapp:S.screen==='whatsapp', scOnboarding:S.screen==='onboarding',
+      brandTruck:this.ic('truck',22,2), I,
+      // dashboard
+      alerts, stats, rankView, recent,
+      custoMediaTxt:'R$\u00a02,31', // média ponderada
+      // topbar helpers
+      onNovo:()=>this.setState({modal:'viagem'}),
+      goWhats:()=>this.go('whatsapp'),
+      // viagens
+      vStatusChips, vTruckChips, viagensView, vCountTxt:vfilt.length+(vfilt.length===1?' viagem':' viagens'),
+      vFatTxt:this.brl0(vTotFat), vRecTxt:this.brl0(vTotRec), vEmpty:vfilt.length===0,
+      // despesas
+      dCatChips, despesasView, dTotTxt:this.brl0(dTot), dCountTxt:dfilt.length+(dfilt.length===1?' despesa':' despesas'), dEmpty:dfilt.length===0,
+      // caminhões
+      trucksView, tdView, hasTruckDetail:!!td, showTruckGrid:!td, closeTruck:()=>this.setState({truckDetail:null}),
+      // financeiro
+      receberGroups, pagarGroups, recTotTxt:this.brl0(recTot), pagTotTxt:this.brl0(pagTot),
+      isReceber, isPagar:!isReceber, setReceber:()=>this.setState({finTab:'receber'}), setPagar:()=>this.setState({finTab:'pagar'}),
+      finRecSty:finTabSty(isReceber), finPagSty:finTabSty(!isReceber),
+      // onboarding
+      obSteps, obStep:S.step, isStep1:S.step===1, isStep2:S.step===2, isStep3:S.step===3,
+      obNext:()=>this.setState(st=>({step:Math.min(3,st.step+1)})), obBack:()=>this.setState(st=>({step:Math.max(1,st.step-1)})),
+      obFinish:()=>this.go('inicio'), qrSvg:this.makeQR(),
+      // modals / fab
+      modalOpen:!!S.modal, isViagemModal:S.modal==='viagem', isDespesaModal:S.modal==='despesa',
+      closeModal:()=>this.setState({modal:null}), stopProp:(e)=>e.stopPropagation(),
+      showFab, fabLabel:S.screen==='despesas'?'Nova despesa':'Nova viagem',
+      fabAction:()=>this.setState({modal:S.screen==='despesas'?'despesa':'viagem'}),
+      saveModal:()=>this.setState({modal:null})
+    };
+  }
+}
+</script>
+</body>
+</html>
