@@ -313,6 +313,28 @@ export function ViagemForm({
         </div>
       </div>
 
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="segurado">Segurado</Label>
+          <Input
+            id="segurado"
+            name="segurado"
+            placeholder="Nome do segurado/cliente"
+            defaultValue={viagem?.segurado ?? ""}
+          />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="placa_cliente">Placa do veículo do cliente</Label>
+          <Input
+            id="placa_cliente"
+            name="placa_cliente"
+            placeholder="AAA0A00"
+            defaultValue={viagem?.placa_cliente ?? ""}
+          />
+        </div>
+      </div>
+
       <div className="flex flex-col gap-2">
         <Label htmlFor="observacoes">Observações</Label>
         <Textarea

@@ -61,6 +61,10 @@ export type Viagem = {
   status: ViagemStatus;
   data: string;
   observacoes: string | null;
+  /** Nome do segurado/cliente dono do veículo guinchado. */
+  segurado: string | null;
+  /** Placa do veículo do cliente guinchado (normalizada: maiúscula, sem espaço). */
+  placa_cliente: string | null;
   created_at: string;
   clientes: { nome: string } | null;
   motoristas: { nome: string } | null;
@@ -407,6 +411,10 @@ export type ItemRascunho = {
   /** Origem/destino do trajeto (ex: "socorro de X até Y"). Quando ambos presentes, gera uma viagem ao confirmar. */
   origem?: string | null;
   destino?: string | null;
+  /** Nome do segurado/cliente dono do veículo guinchado. */
+  segurado?: string | null;
+  /** Placa do veículo do cliente, já normalizada (maiúscula, sem espaço). */
+  placaCliente?: string | null;
 };
 
 /** Uma mensagem pode gerar vários lançamentos (ex: receita + despesa juntos). */

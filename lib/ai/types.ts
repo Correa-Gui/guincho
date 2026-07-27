@@ -33,6 +33,10 @@ export type ItemLancamento = {
   origem: string | null;
   /** Local de destino do trajeto. Senão null. */
   destino: string | null;
+  /** Nome do segurado/cliente dono do veículo guinchado (ex: "segurado: Maria Silva"). Senão null. */
+  segurado: string | null;
+  /** Placa do veículo do cliente guinchado, como veio na mensagem (sem normalizar). Senão null. */
+  placaCliente: string | null;
 };
 
 export type MensagemInterpretada = {

@@ -31,3 +31,13 @@ export function diasEntre(value: string): number {
   const data = new Date(value.length === 10 ? `${value}T00:00:00` : value);
   return Math.round((data.getTime() - hoje.getTime()) / 86_400_000);
 }
+
+// Placa antiga (AAA0000) e Mercosul (AAA0A00) diferem só no 5º caractere
+// (dígito na antiga, letra na Mercosul) — um único regex cobre as duas.
+const REGEX_PLACA = /^[A-Z]{3}\d[A-Z0-9]\d{2}$/;
+
+/** Normaliza (maiúsculas, sem espaço/hífen) e valida placa nos formatos antigo e Mercosul. */
+export function validarPlaca(raw: string): { normalizada: string; valida: boolean } {
+  const normalizada = raw.toUpperCase().replace(/[\s-]/g, "");
+  return { normalizada, valida: REGEX_PLACA.test(normalizada) };
+}

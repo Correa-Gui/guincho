@@ -76,7 +76,7 @@ export function AppSidebar({
           </div>
           <div className="leading-tight">
             <div className="text-base font-extrabold tracking-tight text-foreground">
-              GuinchoFin
+              TFA Guincho
             </div>
             <div className="mt-1 text-[9.5px] font-semibold uppercase tracking-[0.18em] text-gold">
               Gestão · Guincho

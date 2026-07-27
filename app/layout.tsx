@@ -15,7 +15,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Guincho SaaS",
+  title: "TFA Guincho",
   description: "Gestão de custos e operação para empresas de guincho/reboque",
 };
 

@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PerfilForm } from "@/components/admin/perfil-form";
+import { UsuarioForm } from "@/components/admin/usuario-form";
 import { UsuarioPerfilForm } from "@/components/admin/usuario-perfil-form";
 import { createClient } from "@/lib/supabase/server";
 import { PAGINAS_MENU, type PerfilAcesso, type UsuarioEmpresa } from "@/lib/types";
@@ -109,6 +110,15 @@ export default async function PerfilAcessoPage() {
               </div>
             ))
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Novo usuário</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <UsuarioForm perfis={perfis ?? []} />
         </CardContent>
       </Card>
 

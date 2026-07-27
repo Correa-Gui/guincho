@@ -22,7 +22,7 @@ export default async function ViagensPage() {
   const { data: viagens } = await supabase
     .from("viagens")
     .select(
-      "id, origem, destino, origem_uf, destino_uf, valor, status, data, clientes(nome), motoristas(nome), veiculos_frota(placa, modelo)",
+      "id, origem, destino, origem_uf, destino_uf, valor, status, data, segurado, placa_cliente, clientes(nome), motoristas(nome), veiculos_frota(placa, modelo)",
     )
     .order("data", { ascending: false })
     .returns<Viagem[]>();
@@ -96,6 +96,12 @@ export default async function ViagensPage() {
                     <div className="truncate text-xs text-muted-foreground">
                       {viagem.origem ?? "—"} → {viagem.destino ?? "—"}
                     </div>
+                    {(viagem.segurado || viagem.placa_cliente) && (
+                      <div className="truncate text-xs text-muted-foreground">
+                        {viagem.segurado ?? "—"}
+                        {viagem.placa_cliente ? ` · ${viagem.placa_cliente}` : ""}
+                      </div>
+                    )}
                     <div className="text-right font-mono text-base font-semibold tabular-nums text-foreground">
                       {formatCurrency(viagem.valor)}
                     </div>
@@ -114,6 +120,7 @@ export default async function ViagensPage() {
                     <TableHead>Data</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Origem → Destino</TableHead>
+                    <TableHead>Segurado / Placa</TableHead>
                     <TableHead>Motorista</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
                     <TableHead>Status</TableHead>
@@ -135,6 +142,12 @@ export default async function ViagensPage() {
                       <TableCell>
                         <Link href={`/viagens/${viagem.id}/editar`} className="block max-w-xs truncate">
                           {viagem.origem ?? "—"} → {viagem.destino ?? "—"}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <Link href={`/viagens/${viagem.id}/editar`} className="block max-w-[10rem] truncate">
+                          {viagem.segurado ?? "—"}
+                          {viagem.placa_cliente ? ` · ${viagem.placa_cliente}` : ""}
                         </Link>
                       </TableCell>
                       <TableCell>

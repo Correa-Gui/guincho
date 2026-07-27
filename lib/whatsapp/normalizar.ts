@@ -1,4 +1,5 @@
 import { LANCAMENTO_CATEGORIAS, type ItemRascunho, type LancamentoTipo } from "@/lib/types";
+import { validarPlaca } from "@/lib/format";
 import type { ComprovanteExtraido, ItemLancamento, MensagemInterpretada } from "@/lib/ai";
 import type { RascunhoPayload } from "./types";
 
@@ -58,6 +59,8 @@ function normalizarItem(
     descricao: item.descricao,
     origem: item.origem,
     destino: item.destino,
+    segurado: item.segurado,
+    placaCliente: item.placaCliente ? validarPlaca(item.placaCliente).normalizada : null,
   };
 }
 

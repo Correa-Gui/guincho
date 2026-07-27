@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { parseValor } from "@/lib/parse";
+import { validarPlaca } from "@/lib/format";
 import { getCoordsComFallback } from "@/lib/ibge";
 import { getRota, type PontoRota } from "@/lib/rotas";
 import type { ViagemStatus } from "@/lib/types";
@@ -80,7 +81,15 @@ async function buildPayload(formData: FormData) {
     status: (formData.get("status") as string) || "agendada",
     data: (formData.get("data") as string) || new Date().toISOString().slice(0, 10),
     observacoes: (formData.get("observacoes") as string) || null,
+    segurado: (formData.get("segurado") as string) || null,
+    placa_cliente: placaClienteNormalizada(formData.get("placa_cliente") as string | null),
   };
+}
+
+/** Normaliza a placa digitada (maiúscula, sem espaço/hífen); não bloqueia se o formato não bater. */
+function placaClienteNormalizada(raw: string | null): string | null {
+  if (!raw?.trim()) return null;
+  return validarPlaca(raw).normalizada;
 }
 
 export type SugestaoRota = {

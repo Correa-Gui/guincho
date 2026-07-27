@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getAIProvider, AIProviderError, buscarConfiguracaoIA, categoriasDaConfiguracao, type ConfiguracaoIA } from "@/lib/ai";
 import { LANCAMENTO_TIPO_LABEL, type ItemRascunho, type LancamentoTipo } from "@/lib/types";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, validarPlaca } from "@/lib/format";
 import { resolverLocalizacao } from "@/lib/enderecos";
 import { getRota } from "@/lib/rotas";
 import { baixarMidiaMensagem, enviarMensagemTexto, numeroDoJid } from "./evolution";
@@ -474,6 +474,8 @@ async function criarViagemDoItem(
       status: "concluida",
       data: item.data,
       observacoes: item.descricao,
+      segurado: item.segurado ?? null,
+      placa_cliente: item.placaCliente ?? null,
     })
     .select("id")
     .single();
@@ -510,23 +512,36 @@ function mensagemErroIA(err: unknown): string {
   return "não consegui processar com a IA";
 }
 
+/**
+ * Placas inválidas não bloqueiam a viagem (é criada normalmente), mas o
+ * grupo é avisado pra corrigir depois — geralmente na edição manual.
+ */
+function avisoPlacaInvalida(itens: RascunhoPayload["itens"]): string {
+  const invalidas = itens
+    .map((item) => item.placaCliente)
+    .filter((placa): placa is string => !!placa && !validarPlaca(placa).valida);
+  if (invalidas.length === 0) return "";
+  return `\n⚠️ Placa "${invalidas.join('", "')}" não parece válida (formatos aceitos: AAA0000 ou AAA0A00). A viagem foi aberta assim mesmo — corrija a placa depois na edição.`;
+}
+
 /** Mensagem de confirmação (status "pendente") ou pedido de valor (status "erro"). */
 function mensagemRascunho(numero: string, payload: RascunhoPayload, status: "pendente" | "erro"): string {
   const itens = payload.itens;
+  const aviso = avisoPlacaInvalida(itens);
 
   if (status === "erro") {
     if (itens.length === 1) {
-      return `@${numero}, não consegui identificar o valor desse lançamento. Responda com o valor correto (ex: "45.90") pra eu completar.`;
+      return `@${numero}, não consegui identificar o valor desse lançamento. Responda com o valor correto (ex: "45.90") pra eu completar.${aviso}`;
     }
     const lista = itens
       .map((item, i) => `${i + 1}) ${item.categoria}${item.valor !== null ? ` — ${formatCurrency(item.valor)}` : " — valor?"}`)
       .join("\n");
-    return `@${numero}, identifiquei ${itens.length} lançamentos, mas falta o valor de algum deles:\n${lista}\nResponda com o(s) valor(es) correto(s) pra eu completar.`;
+    return `@${numero}, identifiquei ${itens.length} lançamentos, mas falta o valor de algum deles:\n${lista}\nResponda com o(s) valor(es) correto(s) pra eu completar.${aviso}`;
   }
 
   if (itens.length === 1) {
     const item = itens[0];
-    return `@${numero}, registrei ${formatCurrency(item.valor!)} de ${item.categoria} (${LANCAMENTO_TIPO_LABEL[item.tipo]}) em ${formatDate(item.data)}. Responda *SIM* para salvar ou corrija o valor/categoria.`;
+    return `@${numero}, registrei ${formatCurrency(item.valor!)} de ${item.categoria} (${LANCAMENTO_TIPO_LABEL[item.tipo]}) em ${formatDate(item.data)}. Responda *SIM* para salvar ou corrija o valor/categoria.${aviso}`;
   }
 
   const lista = itens
@@ -535,7 +550,7 @@ function mensagemRascunho(numero: string, payload: RascunhoPayload, status: "pen
       return `${i + 1}) ${LANCAMENTO_TIPO_LABEL[item.tipo]} ${formatCurrency(item.valor!)} — ${item.categoria}${descricao}`;
     })
     .join("\n");
-  return `@${numero}, registrei:\n${lista}\nConfirma os ${itens.length} lançamentos? Responda *SIM* para salvar ou corrija.`;
+  return `@${numero}, registrei:\n${lista}\nConfirma os ${itens.length} lançamentos? Responda *SIM* para salvar ou corrija.${aviso}`;
 }
 
 /** Cria o rascunho pendente, faz upload da mídia (se houver) e responde no grupo. */
