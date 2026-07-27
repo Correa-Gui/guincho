@@ -8,8 +8,9 @@ import {
   Car,
   Warehouse,
   Wallet,
-  MessageCircle,
   Fuel,
+  ShieldCheck,
+  UserRound,
 } from "lucide-react";
 import {
   Sidebar,
@@ -31,8 +32,9 @@ const nav = [
   { href: "/patio", label: "Pátio", icon: Warehouse },
   { href: "/financeiro", label: "Financeiro", icon: Wallet },
   { href: "/frota", label: "Frota", icon: Car },
+  { href: "/motoristas", label: "Motoristas", icon: UserRound },
   { href: "/abastecimentos", label: "Abastecimentos", icon: Fuel },
-  { href: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { href: "/admin", label: "Admin", icon: ShieldCheck },
 ];
 
 const availableRoutes = new Set([
@@ -41,13 +43,29 @@ const availableRoutes = new Set([
   "/patio",
   "/financeiro",
   "/frota",
+  "/motoristas",
   "/abastecimentos",
-  "/whatsapp",
+  "/admin",
 ]);
 
-export function AppSidebar({ userEmail }: { userEmail?: string }) {
+/** Item liberado se acesso é total (`null`), é a Início, ou alguma página do perfil está dentro dele. */
+function itemPermitido(href: string, paginasPermitidas: string[] | null) {
+  if (paginasPermitidas === null) return true;
+  if (href === "/") return true;
+  return paginasPermitidas.some((pagina) => pagina === href || pagina.startsWith(`${href}/`));
+}
+
+export function AppSidebar({
+  userEmail,
+  paginasPermitidas = null,
+}: {
+  userEmail?: string;
+  /** Páginas liberadas pelo perfil de acesso do usuário. `null` = acesso total (ex: admin). */
+  paginasPermitidas?: string[] | null;
+}) {
   const pathname = usePathname();
   const initial = (userEmail ?? "?").charAt(0).toUpperCase();
+  const itensVisiveis = nav.filter((item) => itemPermitido(item.href, paginasPermitidas));
 
   return (
     <Sidebar>
@@ -72,7 +90,7 @@ export function AppSidebar({ userEmail }: { userEmail?: string }) {
           <SidebarGroupLabel>Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {nav.map((item) => {
+              {itensVisiveis.map((item) => {
                 const isAvailable = availableRoutes.has(item.href);
                 const isActive =
                   pathname === item.href ||

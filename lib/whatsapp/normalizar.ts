@@ -1,88 +1,132 @@
-import { LANCAMENTO_CATEGORIAS, type LancamentoTipo } from "@/lib/types";
-import type { ComprovanteExtraido, MensagemInterpretada } from "@/lib/ai";
+import { LANCAMENTO_CATEGORIAS, type ItemRascunho, type LancamentoTipo } from "@/lib/types";
+import type { ComprovanteExtraido, ItemLancamento, MensagemInterpretada } from "@/lib/ai";
 import type { RascunhoPayload } from "./types";
 
-function hojeISO(): string {
-  return new Date().toISOString().slice(0, 10);
+/** Categorias válidas por tipo, configuráveis por empresa (ver `categoriasDaConfiguracao`). */
+export type Categorias = { receita: readonly string[]; despesa: readonly string[] };
+
+const CATEGORIAS_PADRAO: Categorias = LANCAMENTO_CATEGORIAS;
+
+/**
+ * Data de hoje no fuso de Brasília (não UTC). Mensagens enviadas à noite
+ * (depois de ~21h em horário de verão inexistente/BRT -03:00) cairiam no dia
+ * seguinte se usássemos `new Date().toISOString()`, que é sempre UTC.
+ */
+export function hojeISO(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 }
 
 function arredondar(valor: number): number {
   return Math.round(valor * 100) / 100;
 }
 
-function categoriaValida(tipo: LancamentoTipo, categoria: string | null): string {
-  const opcoes: readonly string[] = LANCAMENTO_CATEGORIAS[tipo];
+function categoriaValida(tipo: LancamentoTipo, categoria: string | null, categorias: Categorias): string {
+  const opcoes = categorias[tipo];
   if (categoria && opcoes.includes(categoria)) return categoria;
   return "Outros";
 }
 
-/** Foto de comprovante = sempre despesa. */
-export function normalizarComprovante(extraido: ComprovanteExtraido): RascunhoPayload {
+/** Foto de comprovante = sempre despesa, sempre 1 item. */
+export function normalizarComprovante(extraido: ComprovanteExtraido, categorias: Categorias = CATEGORIAS_PADRAO): RascunhoPayload {
   return {
-    tipo: "despesa",
-    valor: extraido.valor !== null ? arredondar(extraido.valor) : null,
-    categoria: categoriaValida("despesa", extraido.categoria),
-    data: extraido.data ?? hojeISO(),
-    descricao: extraido.descricao,
-    estabelecimento: extraido.estabelecimento,
+    itens: [
+      {
+        tipo: "despesa",
+        valor: extraido.valor !== null ? arredondar(extraido.valor) : null,
+        categoria: categoriaValida("despesa", extraido.categoria, categorias),
+        data: extraido.data ?? hojeISO(),
+        descricao: extraido.descricao,
+        estabelecimento: extraido.estabelecimento,
+      },
+    ],
+    motorista: null,
+  };
+}
+
+function normalizarItem(
+  item: ItemLancamento,
+  dataPadrao: string,
+  categorias: Categorias,
+  tipoForcado?: LancamentoTipo,
+): ItemRascunho {
+  const tipo = tipoForcado ?? item.tipo;
+  return {
+    tipo,
+    valor: item.valor !== null ? arredondar(item.valor) : null,
+    categoria: categoriaValida(tipo, item.categoria, categorias),
+    data: item.data ?? dataPadrao,
+    descricao: item.descricao,
+    origem: item.origem,
+    destino: item.destino,
   };
 }
 
 /**
- * Áudio/texto interpretados. `tipoForcado` é usado quando o texto começa
- * com um comando explícito (/gasto ou /ganho) — nesse caso o comando manda,
- * independente do que a IA inferir como intenção.
+ * Áudio/texto interpretados. Uma mensagem pode conter vários lançamentos
+ * (ex: receita do frete + despesa do almoço), cada um virando um item de
+ * `itens`. `tipoForcado` é usado quando o texto começa com um comando
+ * explícito (/gasto ou /ganho) — nesse caso o comando manda e é aplicado a
+ * TODOS os itens, independente do que a IA inferir como tipo.
  */
 export function normalizarMensagem(
   interpretado: MensagemInterpretada,
   tipoForcado?: LancamentoTipo,
+  categorias: Categorias = CATEGORIAS_PADRAO,
 ): RascunhoPayload | null {
-  const tipo =
-    tipoForcado ??
-    (interpretado.intencao === "receita"
-      ? "receita"
-      : interpretado.intencao === "despesa"
-        ? "despesa"
-        : null);
+  if (interpretado.itens.length === 0) return null;
 
-  if (!tipo) return null;
+  const dataPadrao = interpretado.data ?? hojeISO();
+  const itens = interpretado.itens.map((item) => normalizarItem(item, dataPadrao, categorias, tipoForcado));
 
-  return {
-    tipo,
-    valor: interpretado.valor !== null ? arredondar(interpretado.valor) : null,
-    categoria: categoriaValida(tipo, interpretado.categoria),
-    data: interpretado.data ?? hojeISO(),
-    descricao: interpretado.descricao,
-  };
+  return { itens, motorista: interpretado.motorista };
 }
 
 /**
- * Aplica uma correção sobre um rascunho existente: campos não-nulos na
- * interpretação sobrescrevem os do rascunho atual; o resto é preservado.
+ * Aplica uma correção sobre um rascunho existente. Cada item da correção é
+ * casado com um item do rascunho pela categoria mencionada; se não houver
+ * categoria ou não houver match e o rascunho tiver só 1 item, corrige esse
+ * item. Campos não-nulos da correção sobrescrevem os do item; o resto é
+ * preservado. Itens sem match são ignorados.
  */
 export function aplicarCorrecao(
   atual: RascunhoPayload,
   correcao: MensagemInterpretada,
+  categorias: Categorias = CATEGORIAS_PADRAO,
 ): RascunhoPayload {
-  const tipo: LancamentoTipo =
-    correcao.intencao === "receita" ? "receita" : correcao.intencao === "despesa" ? "despesa" : atual.tipo;
+  if (correcao.itens.length === 0) return atual;
 
-  return {
-    tipo,
-    valor: correcao.valor !== null ? arredondar(correcao.valor) : atual.valor,
-    categoria: correcao.categoria ? categoriaValida(tipo, correcao.categoria) : atual.categoria,
-    data: correcao.data ?? atual.data,
-    descricao: correcao.descricao ?? atual.descricao,
-    estabelecimento: atual.estabelecimento,
-  };
+  const itens = atual.itens.map((item) => ({ ...item }));
+
+  for (const corrItem of correcao.itens) {
+    let idx = corrItem.categoria ? itens.findIndex((item) => item.categoria === corrItem.categoria) : -1;
+    if (idx === -1 && itens.length === 1) idx = 0;
+    if (idx === -1) continue;
+
+    const atualItem = itens[idx];
+    const tipo = corrItem.tipo ?? atualItem.tipo;
+
+    itens[idx] = {
+      ...atualItem,
+      tipo,
+      valor: corrItem.valor !== null ? arredondar(corrItem.valor) : atualItem.valor,
+      categoria: corrItem.categoria ? categoriaValida(tipo, corrItem.categoria, categorias) : atualItem.categoria,
+      data: corrItem.data ?? atualItem.data,
+      descricao: corrItem.descricao ?? atualItem.descricao,
+    };
+  }
+
+  return { itens, motorista: correcao.motorista ?? atual.motorista };
 }
 
 /** Verdadeiro se a correção não trouxe nenhuma informação nova aproveitável. */
 export function correcaoVazia(correcao: MensagemInterpretada): boolean {
-  return (
-    correcao.valor === null &&
-    correcao.categoria === null &&
-    correcao.data === null &&
-    correcao.descricao === null
+  if (correcao.itens.length === 0) return true;
+  return correcao.itens.every(
+    (item) => item.valor === null && item.categoria === null && item.data === null && item.descricao === null,
   );
+}
+
+/** Verdadeiro se todos os itens do rascunho têm valor > 0 (pronto para salvar). */
+export function payloadCompleto(payload: RascunhoPayload): boolean {
+  return payload.itens.length > 0 && payload.itens.every((item) => item.valor !== null && item.valor > 0);
 }

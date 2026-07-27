@@ -6,6 +6,7 @@ import { KPICard } from "@/components/dashboard/kpi-card";
 import { PanelCard } from "@/components/dashboard/panel-card";
 import { CashFlowChart, type CashFlowPoint } from "@/components/dashboard/cash-flow-chart";
 import { createClient } from "@/lib/supabase/server";
+import { gerarAlertasAutomaticos } from "@/lib/alertas";
 import { gerarLancamentosDoMes } from "@/lib/contas-fixas";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
 import {
@@ -49,12 +50,18 @@ function monthLabel(date: Date): string {
   return (label.charAt(0).toUpperCase() + label.slice(1)).replace(".", "");
 }
 
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const nome = user?.email?.split("@")[0] ?? "";
 
-  await gerarLancamentosDoMes(supabase);
+  await Promise.all([gerarLancamentosDoMes(supabase), gerarAlertasAutomaticos(supabase)]);
 
   const hoje = new Date();
   const hojeStr = toISODate(hoje);
@@ -138,6 +145,12 @@ export default async function DashboardPage() {
     };
   });
 
+  const dataLabel = capitalize(
+    new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "numeric", month: "long" }).format(
+      hoje,
+    ),
+  );
+
   const kpis = [
     {
       label: "Caixa do mês",
@@ -175,10 +188,10 @@ export default async function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-          Início
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">Olá, {nome}.</p>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Início</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Olá, {nome} · {dataLabel}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -231,7 +244,12 @@ export default async function DashboardPage() {
         <PanelCard
           title="Alertas"
           action={
-            <Button variant="ghost" size="sm" render={<Link href="/alertas" />}>
+            <Button
+              variant="ghost"
+              size="sm"
+              render={<Link href="/alertas" />}
+              nativeButton={false}
+            >
               Ver todos
             </Button>
           }
@@ -269,7 +287,7 @@ export default async function DashboardPage() {
                     className="flex items-center justify-between gap-2 text-sm hover:text-brand-strong"
                   >
                     <div className="flex flex-col">
-                      <span className="font-medium text-foreground group-hover:text-brand-strong">
+                      <span className="font-medium text-foreground">
                         {viagem.clientes?.nome ?? "—"}
                       </span>
                       <span className="text-xs text-muted-foreground">

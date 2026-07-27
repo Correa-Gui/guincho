@@ -15,7 +15,7 @@ export default async function EditarVeiculoPage({
 
   const { data: veiculo } = await supabase
     .from("veiculos_frota")
-    .select("id, placa, modelo, ano, status, created_at")
+    .select("id, placa, modelo, ano, status, consumo_kml, tarifa_km, created_at")
     .eq("id", id)
     .maybeSingle<VeiculoFrotaCompleto>();
 

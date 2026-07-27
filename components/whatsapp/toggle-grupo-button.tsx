@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { toggleGrupo } from "@/app/(dashboard)/whatsapp/actions";
+import { toggleGrupo } from "@/app/(dashboard)/admin/whatsapp/actions";
 
 export function ToggleGrupoButton({ id, ativo }: { id: string; ativo: boolean }) {
   return (

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -10,12 +10,14 @@ function EmptyStateContent({
   description,
   actionLabel,
   actionHref,
+  actionNode,
 }: {
   icon: ComponentType<{ className?: string }>;
   title: string;
   description?: string;
   actionLabel?: string;
   actionHref?: string;
+  actionNode?: ReactNode;
 }) {
   return (
     <div className="flex flex-col items-center gap-3 text-center">
@@ -28,8 +30,10 @@ function EmptyStateContent({
           <p className="text-sm text-muted-foreground">{description}</p>
         ) : null}
       </div>
-      {actionLabel && actionHref ? (
-        <Button variant="brand" size="sm" render={<Link href={actionHref} />} className="mt-1">
+      {actionNode ? (
+        <div className="mt-1">{actionNode}</div>
+      ) : actionLabel && actionHref ? (
+        <Button variant="brand" size="sm" render={<Link href={actionHref} />} nativeButton={false} className="mt-1">
           {actionLabel}
         </Button>
       ) : null}
@@ -47,6 +51,7 @@ export function EmptyState({
   description?: string;
   actionLabel?: string;
   actionHref?: string;
+  actionNode?: ReactNode;
   bare?: boolean;
   className?: string;
 }) {

@@ -227,6 +227,113 @@ painel de produção, configurar a URL do webhook no Evolution
 (`/api/webhook/evolution/<EVOLUTION_WEBHOOK_SECRET>`) e cadastrar o grupo
 autorizado pela própria UI em `/whatsapp` (não precisa mais de SQL manual).
 
+### ✅ Sub-fase 5.6 — Uma mensagem pode gerar múltiplos lançamentos
+
+Caso real que falhou: áudio "viagem de Jaboticabal a Taiúçu, gastei 40 de
+almoço" virava UMA receita de R$300 com o almoço só na descrição. Agora
+`interpretarMensagem` retorna uma LISTA de lançamentos por mensagem.
+
+- `lib/ai/types.ts`: novo `ItemLancamento` (`{tipo, valor, categoria, data,
+  descricao}`); `MensagemInterpretada` passa a ser `{intencao, data, itens:
+  ItemLancamento[]}` (`data` = data padrão da mensagem, fallback p/ itens sem
+  data própria). Exportado também em `lib/ai/index.ts`.
+- `lib/ai/gemini.ts`: prompt de `interpretarMensagem` reescrito —
+  REGRA-CHAVE: cada ganho/gasto citado é um item separado; um valor descrito
+  como GASTO é SEMPRE item `despesa` (nunca embutido na descrição de uma
+  receita) e vice-versa. Few-shots cobrindo só receita, só despesa, mensagem
+  mista receita+despesa (caso do almoço) e múltiplas despesas numa fala, +
+  exemplo de `correcao`. Parse seguro descarta itens com `tipo` inválido.
+  `lerComprovante` inalterado (comprovante = sempre 1 despesa).
+- `lib/types.ts`: novo `ItemRascunho`; `LancamentoPendentePayload` agora é
+  `{itens: ItemRascunho[]}`. Nova categoria de despesa **"Alimentação"**
+  (faltava no enum — necessária p/ o caso do almoço).
+- `lib/whatsapp/types.ts`: `RascunhoPayload = {itens: ItemRascunho[]}`
+  (mesmo shape; sem mudança de schema, `payload` já era `jsonb`).
+- `lib/whatsapp/normalizar.ts`:
+  - `normalizarComprovante`/`normalizarMensagem` retornam `{itens: [...]}`
+    (foto = sempre 1 item; mensagem = 1 item por lançamento detectado,
+    `tipoForcado` de `/gasto`/`/ganho` aplicado a TODOS os itens).
+    `normalizarMensagem` retorna `null` se `itens` vier vazio.
+  - `aplicarCorrecao`: casa cada item da correção com um item do rascunho
+    pela `categoria`; se não achar e o rascunho tiver só 1 item, corrige
+    esse. Itens sem match são ignorados.
+  - `correcaoVazia`: true se `itens` vazio ou todos os itens sem nenhum
+    campo aproveitável.
+  - novo `payloadCompleto(payload)`: true se todos os itens têm `valor > 0`
+    (substitui o check antigo de `payload.valor`).
+- `lib/whatsapp/processar.ts`:
+  - `salvarLancamento` insere TODOS os itens do rascunho de uma vez em
+    `lancamentos_financeiros` (cada um com `origem`/`anexo_url` do
+    rascunho) e retorna quantos foram salvos.
+  - `mensagemRascunho`: com 1 item mantém a mensagem de sempre; com vários
+    itens lista cada um numerado (`1) Receita R$ 300,00 — Frete (...)`) e
+    pede um único "Confirma os N lançamentos? Responda SIM...". Status
+    `erro` com vários itens lista qual(is) está(ão) sem valor.
+  - "SIM" responde "pronto! N lançamentos salvos. ✅" (singular se N=1).
+  - `criarRascunho`/`criarRascunhoComErro`/`semIntencaoDetectada` usam o
+    novo payload `{itens: [...]}`.
+- `app/(dashboard)/whatsapp/page.tsx`: colunas "Categoria"/"Valor" do
+  histórico agora listam todos os itens do rascunho (join por vírgula).
+- Testado via `npm run test:ai -- texto "..."` (frase do almoço): retorna 2
+  itens — receita R$300 Frete + despesa R$40 Alimentação — e
+  `/gasto 60 de pedágio e 35 de almoço` retorna 2 despesas (Pedágio +
+  Alimentação). `npx tsc --noEmit` sem erros.
+
+**Pendente**: testar fim a fim no grupo real (áudio com múltiplos
+lançamentos → confirmação em bloco → SIM → N lançamentos em
+`lancamentos_financeiros`).
+
+### ✅ Sub-fase 5.7 — Aba `/configuracoes` para IA (modelo, categorias, prompts)
+
+Nova página no painel para configurar, por empresa, o modelo Gemini, as
+categorias de receita/despesa e os 3 prompts usados no fluxo WhatsApp/IA.
+Campos em branco usam o padrão do código.
+
+- `supabase/migrations/0009_configuracoes_ia.sql`: tabela
+  `configuracoes_ia` (PK `empresa_id`, FK `empresas`), colunas `modelo`,
+  `categorias_receita`/`categorias_despesa` (`text[]`), 3 prompts (`text`),
+  RLS por `empresa_atual()`. **Pendente aplicar no Supabase remoto.**
+- `lib/ai/types.ts`: novo `ConfiguracaoIA` (`modelo`, `categoriasReceita`,
+  `categoriasDespesa`, 3 prompts — todos `| null`). `AIProvider` (e
+  `GeminiProvider`) aceitam `config?: ConfiguracaoIA` opcional em
+  `transcreverAudio`/`lerComprovante`/`interpretarMensagem`.
+- `lib/ai/gemini.ts`: os 3 prompts viraram templates exportados
+  (`DEFAULT_PROMPT_*`) com placeholders `{{CATEGORIAS_DESPESA}}`,
+  `{{CATEGORIAS_RECEITA}}`, `{{INTENCOES}}`. Cada método usa
+  `config?.prompt* ?? DEFAULT_PROMPT_*`, substitui os placeholders pelas
+  categorias efetivas (config da empresa ou `LANCAMENTO_CATEGORIAS`) e passa
+  `config?.modelo` pro `callJson` (fallback `GEMINI_MODEL`/`gemini-2.0-flash`).
+- `lib/ai/configuracao.ts` (novo): `buscarConfiguracaoIA(supabase, empresaId)`
+  lê a linha de `configuracoes_ia` (snake_case → camelCase, `undefined` se
+  não existir); `categoriasDaConfiguracao(config)` resolve as categorias
+  efetivas (config ou padrão).
+- `lib/whatsapp/normalizar.ts`: `Categorias` agora é parâmetro opcional
+  (default `LANCAMENTO_CATEGORIAS`) em `categoriaValida`,
+  `normalizarComprovante`, `normalizarMensagem`, `aplicarCorrecao`.
+- `lib/whatsapp/processar.ts`: `processarWebhookEvolution` busca
+  `buscarConfiguracaoIA`/`categoriasDaConfiguracao` 1x por mensagem
+  (`IAContext = {config, categorias}`) e propaga pra
+  `processarAudio`/`processarFoto`/`processarTexto`/`processarComando`/
+  `processarRespostaRascunho`, que passam `config` pras chamadas de IA e
+  `categorias` pra `normalizarMensagem`/`normalizarComprovante`/
+  `aplicarCorrecao`.
+- Nova página `app/(dashboard)/configuracoes/page.tsx` +
+  `components/configuracoes/configuracao-form.tsx` +
+  `app/(dashboard)/configuracoes/actions.ts` (`salvarConfiguracaoIA` faz
+  upsert em `configuracoes_ia`; `restaurarConfiguracaoIA` apaga a linha da
+  empresa, voltando aos padrões). Form: modelo, categorias (input
+  separado por vírgula) e os 3 prompts (textarea, pré-preenchidos com o
+  padrão atual quando não configurados).
+- `components/layout/app-sidebar.tsx`: novo item "Configurações"
+  (`/configuracoes`, ícone `Settings`).
+- Escopo: as categorias configuráveis aqui afetam só o fluxo WhatsApp/IA
+  (o que a IA pode escolher e o que `categoriaValida` aceita). Os formulários
+  manuais do financeiro continuam usando `LANCAMENTO_CATEGORIAS` fixo.
+- `npx tsc --noEmit` e `eslint` sem erros.
+
+**Pendente**: aplicar `0009_configuracoes_ia.sql` no Supabase remoto e
+testar a página salvando/restaurando configurações.
+
 ## ✅ Fase 6 — Roteirização e Automações
 
 ### ✅ Sub-fase 6.1 — Localidades (IBGE)
@@ -426,3 +533,88 @@ autorizado pela própria UI em `/whatsapp` (não precisa mais de SQL manual).
   horizontal interno (poucas colunas, não critico).
 
 **Pendente**: nenhum item das fases A–D. Próximo: revisão geral do usuário.
+
+## 🚧 Pass de fluidez (modais + performance de navegação)
+
+### ✅ Etapa 1 — Padrão de modal (Viagens, referência)
+
+- `lib/modal-context.tsx`: `ModalCloseContext`/`useModalClose`.
+- `components/shared/modal.tsx`: `Modal` — wrapper do `Dialog` (shadcn), `open`
+  fixo, `onOpenChange(false)` → `router.back()`; injeta `useModalClose` no
+  conteúdo via context.
+- `components/shared/use-form-feedback.ts`: `useFormFeedback(state, {
+  successMessage, redirectTo })` — toast de sucesso/erro; em sucesso fecha o
+  modal (se dentro de um) ou navega para `redirectTo` (acesso direto à rota
+  `/nova`/`/editar`), e sempre `router.refresh()`.
+- Intercepting routes `app/(dashboard)/@modal/viagens/(.)nova` e
+  `[id]/(.)editar`: reusam `ViagemForm` + `createViagem`/`updateViagem` sem
+  alterar schema/actions. `/viagens/nova` e `/viagens/[id]/editar` continuam
+  funcionando como fallback de deep link/hard navigation.
+- `app/(dashboard)/@modal/default.tsx`: slot vazio quando não há modal ativo.
+- Botões que navegam via `Link` + `render` (shadcn `Button` sobre
+  `@base-ui/react/button`) ganharam `nativeButton={false}` — necessário para
+  o componente renderizar `<a>` em vez de `<button>` e a interceptação de
+  rota funcionar corretamente.
+
+### ✅ Etapa 2 — Mesmo padrão nos demais módulos
+
+- Financeiro (`lancamentos` e `contas a receber`), Frota, Pátio: modais de
+  criar/editar via intercepting routes em `@modal/...`, reusando os forms e
+  server actions existentes. Mesmo comportamento de sucesso/erro/refresh da
+  Etapa 1.
+- Abastecimentos: `@modal/abastecimentos/(.)novo` e `[id]/(.)editar`
+  (`AbastecimentoForm` + `createAbastecimento`/`updateAbastecimento`),
+  completando o módulo. `/abastecimentos/novo` e `/[id]/editar` seguem como
+  fallback.
+
+### ✅ Etapa 3 — Performance de navegação
+
+- `gerarAlertasAutomaticos` saiu do layout autenticado (rodava em toda
+  navegação) e passou a rodar só no dashboard (`/`), junto com
+  `gerarLancamentosDoMes`, em `Promise.all`. O layout só lê os alertas não
+  lidos pro sino (query leve).
+- `proxy.ts`: matcher do proxy de sessão ganhou `missing` para headers
+  `next-router-prefetch`/`purpose: prefetch` — prefetches de Link não passam
+  mais pelo middleware de sessão completo.
+- `lib/supabase/middleware.ts`: `PUBLIC_PATHS` ganha `/api/webhook`;
+  `auth.getUser()` envolvido em try/catch (falha transitória não derruba a
+  navegação).
+- `components/shared/list-skeleton.tsx`: `PageHeaderSkeleton` + `ListSkeleton`
+  reutilizáveis (shadcn `Skeleton`). `loading.tsx` adicionado em
+  `viagens`, `financeiro`, `frota`, `patio`, `abastecimentos`, `alertas` —
+  feedback imediato na troca de rota via Suspense automático do App Router.
+- Queries das páginas de lista já buscavam só o necessário e em paralelo
+  (`Promise.all`) onde havia múltiplas consultas independentes — revisão não
+  encontrou queries sequenciais desnecessárias.
+
+**Pendente**: Etapa 4 (build de produção + validação manual de
+criar/editar/excluir via modal em cada módulo).
+
+## ✅ Fase 7 — Relatório diário no WhatsApp
+
+- `supabase/migrations/0013_relatorio_diario_whatsapp.sql`:
+  `relatorio_diario_destinatarios` (empresa_id, numero único por empresa,
+  nome, ativo) — números que recebem o resumo diário. RLS padrão
+  `empresa_id = empresa_atual()`.
+- `lib/whatsapp/relatorio-diario.ts`: `enviarRelatorioDiarioEmpresa` monta o
+  resumo do dia (saldo, receitas, despesas, despesas por categoria, viagens
+  concluídas e contas atrasadas) a partir de `lancamentos_financeiros` +
+  `viagens` + `contas_a_receber` do dia, formata como mensagem WhatsApp e
+  envia via `enviarMensagemTexto` a cada número ativo;
+  `enviarRelatoriosDiariosTodasEmpresas` itera todas as empresas com
+  destinatário ativo (uso do cron).
+- `app/api/cron/relatorio-diario/[secret]/route.ts`: dispara o envio pra
+  todas as empresas, protegido por segredo no path (mesmo padrão do webhook
+  Evolution), pensado pra ser chamado 1x/dia por um agendador externo.
+- Aba "Relatório diário no WhatsApp" em `/admin/configuracoes`: cadastro de
+  números (`DestinatarioRelatorioForm`), ativar/desativar
+  (`ToggleDestinatarioButton`), excluir (`DeleteButton`) e botão "Enviar
+  teste agora" (`EnviarRelatorioTesteButton`) pra validar sem esperar o cron.
+
+**Pendente**:
+- aplicar `0013_relatorio_diario_whatsapp.sql` no Supabase remoto;
+- definir `RELATORIO_DIARIO_SECRET` no `.env`/ambiente de produção;
+- configurar um agendador externo (cron-job.org, Vercel Cron ou `pg_cron` +
+  `pg_net` no Supabase) pra chamar
+  `GET https://<seu-dominio>/api/cron/relatorio-diario/<RELATORIO_DIARIO_SECRET>`
+  uma vez por dia, no horário desejado.

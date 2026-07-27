@@ -28,10 +28,12 @@ export function LancamentoForm({
   action,
   lancamento,
   viagens,
+  motoristas,
 }: {
   action: Action;
   lancamento?: LancamentoFinanceiro;
   viagens: { id: string; origem: string | null; destino: string | null }[];
+  motoristas: { id: string; nome: string }[];
 }) {
   const [state, formAction, pending] = useActionState(action, {});
   const [tipo, setTipo] = useState<LancamentoTipo>(lancamento?.tipo ?? "receita");
@@ -112,30 +114,53 @@ export function LancamentoForm({
         </div>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="viagem_id">Viagem (opcional)</Label>
-        <Select
-          name="viagem_id"
-          defaultValue={lancamento?.viagem_id ?? ""}
-          items={{
-            "": "Nenhuma",
-            ...Object.fromEntries(
-              viagens.map((v) => [v.id, `${v.origem ?? "—"} → ${v.destino ?? "—"}`]),
-            ),
-          }}
-        >
-          <SelectTrigger id="viagem_id" className="w-full">
-            <SelectValue placeholder="Nenhuma" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">Nenhuma</SelectItem>
-            {viagens.map((viagem) => (
-              <SelectItem key={viagem.id} value={viagem.id}>
-                {viagem.origem ?? "—"} → {viagem.destino ?? "—"}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="viagem_id">Viagem (opcional)</Label>
+          <Select
+            name="viagem_id"
+            defaultValue={lancamento?.viagem_id ?? ""}
+            items={{
+              "": "Nenhuma",
+              ...Object.fromEntries(
+                viagens.map((v) => [v.id, `${v.origem ?? "—"} → ${v.destino ?? "—"}`]),
+              ),
+            }}
+          >
+            <SelectTrigger id="viagem_id" className="w-full">
+              <SelectValue placeholder="Nenhuma" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Nenhuma</SelectItem>
+              {viagens.map((viagem) => (
+                <SelectItem key={viagem.id} value={viagem.id}>
+                  {viagem.origem ?? "—"} → {viagem.destino ?? "—"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="motorista_id">Motorista (opcional)</Label>
+          <Select
+            name="motorista_id"
+            defaultValue={lancamento?.motorista_id ?? ""}
+            items={{ "": "Nenhum", ...Object.fromEntries(motoristas.map((m) => [m.id, m.nome])) }}
+          >
+            <SelectTrigger id="motorista_id" className="w-full">
+              <SelectValue placeholder="Nenhum" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Nenhum</SelectItem>
+              {motoristas.map((motorista) => (
+                <SelectItem key={motorista.id} value={motorista.id}>
+                  {motorista.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="flex flex-col gap-2">

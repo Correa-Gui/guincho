@@ -2,8 +2,9 @@ import Link from "next/link";
 import { Plus, Truck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/shared/empty-state";
+import { BrasilMapaViagens } from "@/components/viagens/brasil-mapa";
 import {
   Table,
   TableBody,
@@ -21,12 +22,19 @@ export default async function ViagensPage() {
   const { data: viagens } = await supabase
     .from("viagens")
     .select(
-      "id, origem, destino, valor, status, data, clientes(nome), motoristas(nome), veiculos_frota(placa, modelo)",
+      "id, origem, destino, origem_uf, destino_uf, valor, status, data, clientes(nome), motoristas(nome), veiculos_frota(placa, modelo)",
     )
     .order("data", { ascending: false })
     .returns<Viagem[]>();
 
   const lista = viagens ?? [];
+
+  const contagemPorUf: Record<string, number> = {};
+  for (const viagem of lista) {
+    if (viagem.origem_uf) contagemPorUf[viagem.origem_uf] = (contagemPorUf[viagem.origem_uf] ?? 0) + 1;
+    if (viagem.destino_uf) contagemPorUf[viagem.destino_uf] = (contagemPorUf[viagem.destino_uf] ?? 0) + 1;
+  }
+  const totalEstados = Object.keys(contagemPorUf).length;
 
   return (
     <div className="flex flex-col gap-6">
@@ -39,14 +47,24 @@ export default async function ViagensPage() {
             Acompanhe e registre os serviços de guincho.
           </p>
         </div>
-        <Button
-          variant="brand"
-          render={<Link href="/viagens/nova" />}
-        >
+        <Button variant="brand" render={<Link href="/viagens/nova" />} nativeButton={false}>
           <Plus />
           Nova viagem
         </Button>
       </div>
+
+      {totalEstados > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Viagens por estado</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="mx-auto max-w-xl">
+              <BrasilMapaViagens contagens={contagemPorUf} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {lista.length === 0 ? (
         <EmptyState
@@ -61,7 +79,7 @@ export default async function ViagensPage() {
           {/* Mobile: cards */}
           <div className="flex flex-col gap-3 sm:hidden">
             {lista.map((viagem) => (
-              <Link key={viagem.id} href={`/viagens/${viagem.id}`}>
+              <Link key={viagem.id} href={`/viagens/${viagem.id}/editar`}>
                 <Card className="transition-colors hover:bg-accent/50">
                   <CardContent className="flex flex-col gap-2">
                     <div className="flex items-center justify-between gap-2">
@@ -105,32 +123,32 @@ export default async function ViagensPage() {
                   {lista.map((viagem) => (
                     <TableRow key={viagem.id} className="cursor-pointer">
                       <TableCell>
-                        <Link href={`/viagens/${viagem.id}`} className="block">
+                        <Link href={`/viagens/${viagem.id}/editar`} className="block">
                           {formatDate(viagem.data)}
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <Link href={`/viagens/${viagem.id}`} className="block">
+                        <Link href={`/viagens/${viagem.id}/editar`} className="block">
                           {viagem.clientes?.nome ?? "—"}
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <Link href={`/viagens/${viagem.id}`} className="block max-w-xs truncate">
+                        <Link href={`/viagens/${viagem.id}/editar`} className="block max-w-xs truncate">
                           {viagem.origem ?? "—"} → {viagem.destino ?? "—"}
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <Link href={`/viagens/${viagem.id}`} className="block">
+                        <Link href={`/viagens/${viagem.id}/editar`} className="block">
                           {viagem.motoristas?.nome ?? "—"}
                         </Link>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Link href={`/viagens/${viagem.id}`} className="block font-mono tabular-nums">
+                        <Link href={`/viagens/${viagem.id}/editar`} className="block font-mono tabular-nums">
                           {formatCurrency(viagem.valor)}
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <Link href={`/viagens/${viagem.id}`} className="block">
+                        <Link href={`/viagens/${viagem.id}/editar`} className="block">
                           <Badge className={VIAGEM_STATUS_BADGE_CLASS[viagem.status]}>
                             {VIAGEM_STATUS_LABEL[viagem.status]}
                           </Badge>

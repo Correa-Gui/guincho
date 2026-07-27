@@ -1,4 +1,4 @@
-import type { LancamentoTipo } from "@/lib/types";
+import type { ItemRascunho } from "@/lib/types";
 
 export type EvolutionMessageKey = {
   remoteJid: string;
@@ -24,12 +24,12 @@ export type EvolutionWebhookBody = {
   };
 };
 
-/** Payload normalizado de um lançamento ainda não confirmado. */
+/**
+ * Payload normalizado de um rascunho ainda não confirmado. Uma mensagem
+ * pode gerar vários lançamentos (ex: receita do frete + despesa do almoço).
+ */
 export type RascunhoPayload = {
-  tipo: LancamentoTipo;
-  valor: number | null;
-  categoria: string;
-  data: string; // YYYY-MM-DD
-  descricao: string | null;
-  estabelecimento?: string | null;
+  itens: ItemRascunho[];
+  /** Nome do motorista mencionado explicitamente na mensagem (override do motorista identificado pelo telefone de quem enviou). */
+  motorista: string | null;
 };

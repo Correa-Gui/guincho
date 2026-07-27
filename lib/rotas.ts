@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 
-const OSRM_BASE_URL = process.env.OSRM_BASE_URL ?? "https://router.project-osrm.org";
+const OSRM_BASE_URL = process.env.OSRM_BASE_URL || "https://router.project-osrm.org";
 
 export type Rota = {
   distanciaKm: number;
@@ -58,22 +58,26 @@ export async function getRota(origem: PontoRota, destino: PontoRota): Promise<Ro
 async function calcularRotaOsrm(origem: PontoRota, destino: PontoRota): Promise<Rota | null> {
   const url = `${OSRM_BASE_URL}/route/v1/driving/${origem.lon},${origem.lat};${destino.lon},${destino.lat}?overview=false`;
 
-  const res = await fetch(url, {
-    headers: { "User-Agent": "GuinchoFin/1.0 (contato@guinchofin.app)" },
-  });
-  if (!res.ok) return null;
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": "GuinchoFin/1.0 (contato@guinchofin.app)" },
+    });
+    if (!res.ok) return null;
 
-  const data = (await res.json()) as {
-    code: string;
-    routes?: { distance: number; duration: number }[];
-  };
-  const route = data.routes?.[0];
-  if (data.code !== "Ok" || !route) return null;
+    const data = (await res.json()) as {
+      code: string;
+      routes?: { distance: number; duration: number }[];
+    };
+    const route = data.routes?.[0];
+    if (data.code !== "Ok" || !route) return null;
 
-  return {
-    distanciaKm: Math.round((route.distance / 1000) * 10) / 10,
-    duracaoMin: Math.round(route.duration / 60),
-    pedagioEstimado: null,
-    fonte: "osrm",
-  };
+    return {
+      distanciaKm: Math.round((route.distance / 1000) * 10) / 10,
+      duracaoMin: Math.round(route.duration / 60),
+      pedagioEstimado: null,
+      fonte: "osrm",
+    };
+  } catch {
+    return null;
+  }
 }

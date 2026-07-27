@@ -17,8 +17,10 @@ import {
   MunicipioAutocomplete,
   type MunicipioSelecionado,
 } from "@/components/shared/municipio-autocomplete";
+import { EnderecoAutocomplete } from "@/components/shared/endereco-autocomplete";
+import type { EnderecoSugestao } from "@/lib/enderecos";
 import { formatCurrency, todayInputValue } from "@/lib/format";
-import { VIAGEM_STATUS_LABEL, type Cliente, type Motorista, type VeiculoFrota, type Viagem } from "@/lib/types";
+import { VIAGEM_STATUS_LABEL, type Motorista, type VeiculoFrota, type Viagem } from "@/lib/types";
 import {
   sugerirRota,
   type SugestaoRota,
@@ -30,13 +32,11 @@ type Action = (prev: ViagemFormState, formData: FormData) => Promise<ViagemFormS
 export function ViagemForm({
   action,
   viagem,
-  clientes,
   motoristas,
   veiculos,
 }: {
   action: Action;
   viagem?: Viagem;
-  clientes: Cliente[];
   motoristas: Motorista[];
   veiculos: VeiculoFrota[];
 }) {
@@ -71,10 +71,15 @@ export function ViagemForm({
   );
   const [sugestao, setSugestao] = useState<SugestaoRota | null>(null);
   const [carregandoSugestao, setCarregandoSugestao] = useState(false);
+  const [veiculoId, setVeiculoId] = useState(viagem?.veiculo_id ?? "");
   const valorInputRef = useRef<HTMLInputElement>(null);
   const consultaIdRef = useRef(0);
 
-  function buscarSugestao(origem: MunicipioSelecionado | null, destino: MunicipioSelecionado | null) {
+  function buscarSugestao(
+    origem: MunicipioSelecionado | null,
+    destino: MunicipioSelecionado | null,
+    veiculo: string,
+  ) {
     if (!origem || !destino) {
       setSugestao(null);
       return;
@@ -85,6 +90,7 @@ export function ViagemForm({
     sugerirRota(
       { ibge: origem.ibge, lat: origem.lat, lon: origem.lon },
       { ibge: destino.ibge, lat: destino.lat, lon: destino.lon },
+      veiculo || null,
     ).then((resultado) => {
       if (consultaIdRef.current !== consultaId) return;
       setSugestao(resultado);
@@ -94,12 +100,27 @@ export function ViagemForm({
 
   function handleOrigemChange(value: MunicipioSelecionado | null) {
     setOrigemMun(value);
-    buscarSugestao(value, destinoMun);
+    buscarSugestao(value, destinoMun, veiculoId);
   }
 
   function handleDestinoChange(value: MunicipioSelecionado | null) {
     setDestinoMun(value);
-    buscarSugestao(origemMun, value);
+    buscarSugestao(origemMun, value, veiculoId);
+  }
+
+  function handleVeiculoChange(value: string) {
+    setVeiculoId(value);
+    buscarSugestao(origemMun, destinoMun, value);
+  }
+
+  function handleEnderecoOrigemSelect(sugestao: EnderecoSugestao) {
+    if (!sugestao.ibge || !sugestao.cidade || !sugestao.uf) return;
+    handleOrigemChange({ cidade: sugestao.cidade, uf: sugestao.uf, ibge: sugestao.ibge, lat: sugestao.lat, lon: sugestao.lon });
+  }
+
+  function handleEnderecoDestinoSelect(sugestao: EnderecoSugestao) {
+    if (!sugestao.ibge || !sugestao.cidade || !sugestao.uf) return;
+    handleDestinoChange({ cidade: sugestao.cidade, uf: sugestao.uf, ibge: sugestao.ibge, lat: sugestao.lat, lon: sugestao.lon });
   }
 
   function usarValorSugerido() {
@@ -110,27 +131,6 @@ export function ViagemForm({
   return (
     <form action={formAction} className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="cliente_id">Cliente</Label>
-          <Select
-            name="cliente_id"
-            defaultValue={viagem?.cliente_id ?? ""}
-            items={{ "": "Nenhum", ...Object.fromEntries(clientes.map((c) => [c.id, c.nome])) }}
-          >
-            <SelectTrigger id="cliente_id" className="w-full">
-              <SelectValue placeholder="Selecione um cliente" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Nenhum</SelectItem>
-              {clientes.map((cliente) => (
-                <SelectItem key={cliente.id} value={cliente.id}>
-                  {cliente.nome}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
         <div className="flex flex-col gap-2">
           <Label htmlFor="motorista_id">Motorista</Label>
           <Select
@@ -151,14 +151,13 @@ export function ViagemForm({
             </SelectContent>
           </Select>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="veiculo_id">Veículo</Label>
           <Select
             name="veiculo_id"
             defaultValue={viagem?.veiculo_id ?? ""}
+            onValueChange={(value) => handleVeiculoChange(value as string)}
             items={{
               "": "Nenhum",
               ...Object.fromEntries(
@@ -180,17 +179,18 @@ export function ViagemForm({
             </SelectContent>
           </Select>
         </div>
+      </div>
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="data">Data</Label>
-          <Input
-            id="data"
-            name="data"
-            type="date"
-            defaultValue={viagem?.data ?? todayInputValue()}
-            required
-          />
-        </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="data">Data</Label>
+        <Input
+          id="data"
+          name="data"
+          type="date"
+          defaultValue={viagem?.data ?? todayInputValue()}
+          required
+          className="sm:max-w-xs"
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -217,12 +217,42 @@ export function ViagemForm({
             <span className="text-muted-foreground">Calculando rota...</span>
           ) : sugestao ? (
             <>
+              {sugestao.saidaBaseKm !== null && (
+                <span className="text-muted-foreground">
+                  Base → origem: <strong>{sugestao.saidaBaseKm} km</strong> · ~
+                  {sugestao.saidaBaseDuracaoMin} min
+                  {sugestao.pedagioSaidaEstimado !== null && (
+                    <> · pedágio est. {formatCurrency(sugestao.pedagioSaidaEstimado)}</>
+                  )}
+                </span>
+              )}
               <span>
-                <strong>{sugestao.distanciaKm} km</strong> · ~{sugestao.duracaoMin} min
+                Origem → destino: <strong>{sugestao.distanciaKm} km</strong> · ~
+                {sugestao.duracaoMin} min
                 {sugestao.pedagioEstimado !== null && (
                   <> · pedágio est. {formatCurrency(sugestao.pedagioEstimado)}</>
                 )}
               </span>
+              {sugestao.retornoKm !== null && (
+                <span className="text-muted-foreground">
+                  Destino → base: <strong>{sugestao.retornoKm} km</strong> · ~
+                  {sugestao.retornoDuracaoMin} min
+                  {sugestao.pedagioRetornoEstimado !== null && (
+                    <> · pedágio est. {formatCurrency(sugestao.pedagioRetornoEstimado)}</>
+                  )}
+                </span>
+              )}
+              {(sugestao.saidaBaseKm !== null || sugestao.retornoKm !== null) && (
+                <span className="text-muted-foreground">
+                  Trajeto total: <strong>{sugestao.distanciaTotalKm} km</strong>
+                </span>
+              )}
+              {sugestao.custoCombustivelEstimado !== null && (
+                <span>
+                  Combustível est.:{" "}
+                  <strong>{formatCurrency(sugestao.custoCombustivelEstimado)}</strong>
+                </span>
+              )}
               <span>Valor sugerido: <strong>{formatCurrency(sugestao.precoSugerido)}</strong></span>
               <Button type="button" size="sm" variant="outline" onClick={usarValorSugerido}>
                 Usar valor sugerido
@@ -235,25 +265,21 @@ export function ViagemForm({
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="origem">Endereço de origem</Label>
-          <Input
-            id="origem"
-            name="origem"
-            placeholder="Endereço de origem"
-            defaultValue={viagem?.origem ?? ""}
-          />
-        </div>
+        <EnderecoAutocomplete
+          id="origem"
+          label="Endereço de origem"
+          namePrefix="origem"
+          defaultValue={viagem?.origem}
+          onSelect={handleEnderecoOrigemSelect}
+        />
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="destino">Endereço de destino</Label>
-          <Input
-            id="destino"
-            name="destino"
-            placeholder="Endereço de destino"
-            defaultValue={viagem?.destino ?? ""}
-          />
-        </div>
+        <EnderecoAutocomplete
+          id="destino"
+          label="Endereço de destino"
+          namePrefix="destino"
+          defaultValue={viagem?.destino}
+          onSelect={handleEnderecoDestinoSelect}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

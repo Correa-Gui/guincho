@@ -1,7 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { DOCUMENTO_TIPO_LABEL, MANUTENCAO_TIPO_LABEL } from "@/lib/types";
 
 const PATIO_DIAS_LIMITE = 3;
+const DOCUMENTO_DIAS_ALERTA = 30;
+const MANUTENCAO_DIAS_ALERTA = 15;
 
 type ContaAtrasada = {
   id: string;
@@ -22,6 +25,20 @@ type ViagemAtrasada = {
   destino: string | null;
   data: string;
   clientes: { nome: string } | null;
+};
+
+type DocumentoProximo = {
+  id: string;
+  tipo: keyof typeof DOCUMENTO_TIPO_LABEL;
+  vencimento: string;
+  veiculos_frota: { placa: string } | null;
+};
+
+type ManutencaoProxima = {
+  id: string;
+  tipo: keyof typeof MANUTENCAO_TIPO_LABEL;
+  data_proxima: string;
+  veiculos_frota: { placa: string } | null;
 };
 
 type AlertaCandidato = {
@@ -58,28 +75,48 @@ export async function gerarAlertasAutomaticos(supabase: SupabaseClient): Promise
   const hojeStr = toISODate(hoje);
   const limitePatio = new Date(hoje);
   limitePatio.setDate(limitePatio.getDate() - PATIO_DIAS_LIMITE);
+  const limiteDocumento = new Date(hoje);
+  limiteDocumento.setDate(limiteDocumento.getDate() + DOCUMENTO_DIAS_ALERTA);
+  const limiteManutencao = new Date(hoje);
+  limiteManutencao.setDate(limiteManutencao.getDate() + MANUTENCAO_DIAS_ALERTA);
 
-  const [{ data: contasVencidas }, { data: veiculosParados }, { data: viagensAtrasadas }] =
-    await Promise.all([
-      supabase
-        .from("contas_a_receber")
-        .select("id, valor, vencimento, clientes(nome)")
-        .in("status", ["pendente", "atrasado"])
-        .lt("vencimento", hojeStr)
-        .returns<ContaAtrasada[]>(),
-      supabase
-        .from("patio")
-        .select("id, veiculo_placa, entrada")
-        .eq("status", "no_patio")
-        .lt("entrada", limitePatio.toISOString())
-        .returns<PatioParado[]>(),
-      supabase
-        .from("viagens")
-        .select("id, origem, destino, data, clientes(nome)")
-        .in("status", ["agendada", "em_andamento"])
-        .lt("data", hojeStr)
-        .returns<ViagemAtrasada[]>(),
-    ]);
+  const [
+    { data: contasVencidas },
+    { data: veiculosParados },
+    { data: viagensAtrasadas },
+    { data: documentosProximos },
+    { data: manutencoesProximas },
+  ] = await Promise.all([
+    supabase
+      .from("contas_a_receber")
+      .select("id, valor, vencimento, clientes(nome)")
+      .in("status", ["pendente", "atrasado"])
+      .lt("vencimento", hojeStr)
+      .returns<ContaAtrasada[]>(),
+    supabase
+      .from("patio")
+      .select("id, veiculo_placa, entrada")
+      .eq("status", "no_patio")
+      .lt("entrada", limitePatio.toISOString())
+      .returns<PatioParado[]>(),
+    supabase
+      .from("viagens")
+      .select("id, origem, destino, data, clientes(nome)")
+      .in("status", ["agendada", "em_andamento"])
+      .lt("data", hojeStr)
+      .returns<ViagemAtrasada[]>(),
+    supabase
+      .from("documentos_frota")
+      .select("id, tipo, vencimento, veiculos_frota(placa)")
+      .lte("vencimento", toISODate(limiteDocumento))
+      .returns<DocumentoProximo[]>(),
+    supabase
+      .from("manutencoes_frota")
+      .select("id, tipo, data_proxima, veiculos_frota(placa)")
+      .not("data_proxima", "is", null)
+      .lte("data_proxima", toISODate(limiteManutencao))
+      .returns<ManutencaoProxima[]>(),
+  ]);
 
   const idsParaAtrasar = (contasVencidas ?? [])
     .map((conta) => conta.id);
@@ -113,6 +150,26 @@ export async function gerarAlertasAutomaticos(supabase: SupabaseClient): Promise
       referencia_tipo: "viagem",
       referencia_id: viagem.id,
     })),
+    ...(documentosProximos ?? []).map((documento) => {
+      const vencido = documento.vencimento < hojeStr;
+      return {
+        empresa_id: empresaId,
+        tipo: vencido ? "documento_vencido" : "documento_vencendo",
+        mensagem: `${DOCUMENTO_TIPO_LABEL[documento.tipo]} do veículo ${documento.veiculos_frota?.placa ?? "—"} ${vencido ? "venceu em" : "vence em"} ${formatDate(documento.vencimento)}.`,
+        referencia_tipo: "documento_frota",
+        referencia_id: documento.id,
+      };
+    }),
+    ...(manutencoesProximas ?? []).map((manutencao) => {
+      const vencida = manutencao.data_proxima < hojeStr;
+      return {
+        empresa_id: empresaId,
+        tipo: vencida ? "manutencao_vencida" : "manutencao_proxima",
+        mensagem: `${MANUTENCAO_TIPO_LABEL[manutencao.tipo]} do veículo ${manutencao.veiculos_frota?.placa ?? "—"} ${vencida ? "venceu em" : "prevista para"} ${formatDate(manutencao.data_proxima)}.`,
+        referencia_tipo: "manutencao_frota",
+        referencia_id: manutencao.id,
+      };
+    }),
   ];
 
   if (candidatos.length === 0) return;

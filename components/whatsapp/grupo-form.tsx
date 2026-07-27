@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useFormFeedback } from "@/components/shared/use-form-feedback";
-import { createGrupo } from "@/app/(dashboard)/whatsapp/actions";
+import { createGrupo } from "@/app/(dashboard)/admin/whatsapp/actions";
 
 export function GrupoForm() {
   const [state, formAction, pending] = useActionState(createGrupo, {});

@@ -24,6 +24,14 @@ export type Motorista = {
   nome: string;
 };
 
+export type MotoristaCompleto = {
+  id: string;
+  nome: string;
+  telefone: string | null;
+  ativo: boolean;
+  created_at: string;
+};
+
 export type VeiculoFrota = {
   id: string;
   placa: string;
@@ -76,7 +84,7 @@ export const LANCAMENTO_TIPO_BADGE_CLASS: Record<LancamentoTipo, string> = {
 
 export const LANCAMENTO_CATEGORIAS = {
   receita: ["Frete", "Guincho", "Outros"],
-  despesa: ["Combustível", "Manutenção", "Pedágio", "Salário", "Outros"],
+  despesa: ["Combustível", "Manutenção", "Pedágio", "Alimentação", "Salário", "Outros"],
 } as const;
 
 export type LancamentoOrigem =
@@ -92,6 +100,7 @@ export type LancamentoFinanceiro = {
   id: string;
   viagem_id: string | null;
   conta_fixa_id: string | null;
+  motorista_id: string | null;
   tipo: LancamentoTipo;
   categoria: string;
   valor: number;
@@ -101,6 +110,7 @@ export type LancamentoFinanceiro = {
   anexo_url: string | null;
   created_at: string;
   viagens: { id: string; origem: string | null; destino: string | null } | null;
+  motoristas: { nome: string } | null;
 };
 
 export type ContaStatus = "pendente" | "pago" | "atrasado";
@@ -152,7 +162,91 @@ export type VeiculoFrotaCompleto = {
   modelo: string | null;
   ano: number | null;
   status: VeiculoStatus;
+  /** Consumo médio do veículo, em km/l. Usado pra estimar custo de combustível na sugestão de preço. */
+  consumo_kml: number | null;
+  /** Tarifa por km (R$) específica do veículo. Quando nula, usa a tarifa padrão da empresa. */
+  tarifa_km: number | null;
   created_at: string;
+};
+
+// ============================================================
+// Manutenções
+// ============================================================
+export type ManutencaoTipo =
+  | "troca_oleo"
+  | "troca_filtro"
+  | "balanceamento"
+  | "alinhamento"
+  | "rodizio_pneus"
+  | "troca_pneus"
+  | "freios"
+  | "revisao"
+  | "bateria"
+  | "outro";
+
+export const MANUTENCAO_TIPO_LABEL: Record<ManutencaoTipo, string> = {
+  troca_oleo: "Troca de óleo",
+  troca_filtro: "Troca de filtro",
+  balanceamento: "Balanceamento",
+  alinhamento: "Alinhamento",
+  rodizio_pneus: "Rodízio de pneus",
+  troca_pneus: "Troca de pneus",
+  freios: "Freios",
+  revisao: "Revisão geral",
+  bateria: "Bateria",
+  outro: "Outro",
+};
+
+export type ManutencaoFrota = {
+  id: string;
+  veiculo_id: string;
+  tipo: ManutencaoTipo;
+  data_realizada: string;
+  data_proxima: string | null;
+  custo: number | null;
+  observacoes: string | null;
+  created_at: string;
+};
+
+// ============================================================
+// Documentos da frota
+// ============================================================
+export type DocumentoTipo = "crlv" | "seguro" | "antt" | "tacografo" | "licenciamento" | "outro";
+
+export const DOCUMENTO_TIPO_LABEL: Record<DocumentoTipo, string> = {
+  crlv: "CRLV",
+  seguro: "Seguro",
+  antt: "ANTT/RNTRC",
+  tacografo: "Tacógrafo",
+  licenciamento: "Licenciamento",
+  outro: "Outro",
+};
+
+export type DocumentoFrota = {
+  id: string;
+  veiculo_id: string;
+  tipo: DocumentoTipo;
+  numero: string | null;
+  vencimento: string;
+  observacoes: string | null;
+  created_at: string;
+};
+
+// ============================================================
+// Status de vencimento (manutenções e documentos)
+// ============================================================
+export type VencimentoStatus = "ok" | "proximo" | "vencido";
+
+export const VENCIMENTO_STATUS_LABEL: Record<VencimentoStatus, string> = {
+  ok: "Em dia",
+  proximo: "Vence em breve",
+  vencido: "Vencido",
+};
+
+export const VENCIMENTO_STATUS_BADGE_CLASS: Record<VencimentoStatus, string> = {
+  ok: "bg-pos/10 text-pos",
+  proximo: "bg-warn/10 text-warn",
+  vencido: "bg-neg/10 text-neg",
 };
 
 // ============================================================
@@ -199,6 +293,46 @@ export type Patio = {
   status: PatioStatus;
   created_at: string;
 };
+
+// ============================================================
+// Perfis de acesso
+// ============================================================
+export type PerfilAcesso = {
+  id: string;
+  nome: string;
+  paginas: string[];
+  created_at: string;
+};
+
+export type UsuarioEmpresa = {
+  id: string;
+  nome: string;
+  role: string;
+  perfil_id: string | null;
+};
+
+/** Páginas que podem ser liberadas por perfil de acesso, agrupadas por menu. */
+export const PAGINAS_MENU: { grupo: string; itens: { value: string; label: string }[] }[] = [
+  {
+    grupo: "Menu principal",
+    itens: [
+      { value: "/", label: "Início" },
+      { value: "/viagens", label: "Viagens" },
+      { value: "/patio", label: "Pátio" },
+      { value: "/financeiro", label: "Financeiro" },
+      { value: "/frota", label: "Frota" },
+      { value: "/motoristas", label: "Motoristas" },
+      { value: "/abastecimentos", label: "Abastecimentos" },
+    ],
+  },
+  {
+    grupo: "Admin",
+    itens: [
+      { value: "/admin/whatsapp", label: "WhatsApp" },
+      { value: "/admin/configuracoes", label: "Configurações" },
+    ],
+  },
+];
 
 // ============================================================
 // Alertas
@@ -262,13 +396,24 @@ export type GrupoWhatsapp = {
   created_at: string;
 };
 
-export type LancamentoPendentePayload = {
+/** Um lançamento normalizado dentro de um rascunho (whatsapp_*). */
+export type ItemRascunho = {
   tipo: LancamentoTipo;
   valor: number | null;
   categoria: string;
   data: string;
   descricao: string | null;
   estabelecimento?: string | null;
+  /** Origem/destino do trajeto (ex: "socorro de X até Y"). Quando ambos presentes, gera uma viagem ao confirmar. */
+  origem?: string | null;
+  destino?: string | null;
+};
+
+/** Uma mensagem pode gerar vários lançamentos (ex: receita + despesa juntos). */
+export type LancamentoPendentePayload = {
+  itens: ItemRascunho[];
+  /** Nome do motorista mencionado explicitamente na mensagem (override do motorista identificado pelo telefone). */
+  motorista: string | null;
 };
 
 export type LancamentoPendente = {

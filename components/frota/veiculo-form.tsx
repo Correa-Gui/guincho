@@ -70,6 +70,38 @@ export function VeiculoForm({
         </div>
 
         <div className="flex flex-col gap-2">
+          <Label htmlFor="consumo_kml">Consumo médio (km/l)</Label>
+          <Input
+            id="consumo_kml"
+            name="consumo_kml"
+            type="text"
+            inputMode="decimal"
+            placeholder="Ex: 3,5"
+            defaultValue={veiculo?.consumo_kml?.toString().replace(".", ",") ?? ""}
+          />
+          <p className="text-xs text-muted-foreground">
+            Usado pra estimar o custo de combustível na sugestão de preço da viagem.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="tarifa_km">Tarifa por km (R$)</Label>
+          <Input
+            id="tarifa_km"
+            name="tarifa_km"
+            type="text"
+            inputMode="decimal"
+            placeholder="Ex: 5,00"
+            defaultValue={veiculo?.tarifa_km?.toString().replace(".", ",") ?? ""}
+          />
+          <p className="text-xs text-muted-foreground">
+            Tarifa específica deste veículo na sugestão de preço. Em branco, usa a tarifa padrão da empresa.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2">
           <Label htmlFor="status">Status</Label>
           <Select name="status" defaultValue={veiculo?.status ?? "ativo"} items={VEICULO_STATUS_LABEL}>
             <SelectTrigger id="status" className="w-full">

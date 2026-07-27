@@ -68,7 +68,6 @@ async function buildPayload(formData: FormData) {
   const rota = await rotaEntreMunicipios(origemMunicipio, destinoMunicipio);
 
   return {
-    cliente_id: (formData.get("cliente_id") as string) || null,
     motorista_id: (formData.get("motorista_id") as string) || null,
     veiculo_id: (formData.get("veiculo_id") as string) || null,
     origem: (formData.get("origem") as string) || null,
@@ -88,12 +87,21 @@ export type SugestaoRota = {
   distanciaKm: number;
   duracaoMin: number;
   pedagioEstimado: number | null;
+  saidaBaseKm: number | null;
+  saidaBaseDuracaoMin: number | null;
+  pedagioSaidaEstimado: number | null;
+  retornoKm: number | null;
+  retornoDuracaoMin: number | null;
+  pedagioRetornoEstimado: number | null;
+  distanciaTotalKm: number;
+  custoCombustivelEstimado: number | null;
   precoSugerido: number;
 };
 
 export async function sugerirRota(
   origem: PontoRota,
   destino: PontoRota,
+  veiculoId?: string | null,
 ): Promise<SugestaoRota | null> {
   const rota = await getRota(origem, destino);
   if (!rota) return null;
@@ -102,6 +110,14 @@ export async function sugerirRota(
   const { data: { user } } = await supabase.auth.getUser();
 
   let tarifaKm = 5;
+  let precoCombustivel = 6;
+  let saidaBaseKm: number | null = null;
+  let saidaBaseDuracaoMin: number | null = null;
+  let pedagioSaidaEstimado: number | null = null;
+  let retornoKm: number | null = null;
+  let retornoDuracaoMin: number | null = null;
+  let pedagioRetornoEstimado: number | null = null;
+
   if (user) {
     const { data: usuario } = await supabase
       .from("usuarios")
@@ -111,20 +127,81 @@ export async function sugerirRota(
     if (usuario) {
       const { data: empresa } = await supabase
         .from("empresas")
-        .select("tarifa_km_padrao")
+        .select("tarifa_km_padrao, preco_combustivel_padrao, base_ibge, base_lat, base_lon")
         .eq("id", usuario.empresa_id)
         .single();
-      if (empresa) tarifaKm = empresa.tarifa_km_padrao;
+      if (empresa) {
+        tarifaKm = empresa.tarifa_km_padrao;
+        precoCombustivel = empresa.preco_combustivel_padrao;
+
+        if (empresa.base_ibge && empresa.base_lat != null && empresa.base_lon != null) {
+          const base: PontoRota = {
+            ibge: empresa.base_ibge,
+            lat: empresa.base_lat,
+            lon: empresa.base_lon,
+          };
+
+          const [saida, retorno] = await Promise.all([
+            getRota(base, origem),
+            getRota(destino, base),
+          ]);
+
+          if (saida) {
+            saidaBaseKm = saida.distanciaKm;
+            saidaBaseDuracaoMin = saida.duracaoMin;
+            pedagioSaidaEstimado = saida.pedagioEstimado;
+          }
+          if (retorno) {
+            retornoKm = retorno.distanciaKm;
+            retornoDuracaoMin = retorno.duracaoMin;
+            pedagioRetornoEstimado = retorno.pedagioEstimado;
+          }
+        }
+      }
+    }
+  }
+
+  const distanciaTotalKm =
+    Math.round((rota.distanciaKm + (saidaBaseKm ?? 0) + (retornoKm ?? 0)) * 10) / 10;
+
+  let custoCombustivelEstimado: number | null = null;
+  if (veiculoId) {
+    const { data: veiculo } = await supabase
+      .from("veiculos_frota")
+      .select("consumo_kml, tarifa_km")
+      .eq("id", veiculoId)
+      .single();
+    if (veiculo?.consumo_kml) {
+      custoCombustivelEstimado =
+        Math.round((distanciaTotalKm / veiculo.consumo_kml) * precoCombustivel * 100) / 100;
+    }
+    if (veiculo?.tarifa_km) {
+      tarifaKm = veiculo.tarifa_km;
     }
   }
 
   const precoSugerido =
-    Math.round((rota.distanciaKm * tarifaKm + (rota.pedagioEstimado ?? 0)) * 100) / 100;
+    Math.round(
+      (rota.distanciaKm * tarifaKm +
+        (rota.pedagioEstimado ?? 0) +
+        (pedagioSaidaEstimado ?? 0) +
+        (pedagioRetornoEstimado ?? 0) +
+        (custoCombustivelEstimado ?? 0)) *
+        100,
+    ) / 100;
 
   return {
     distanciaKm: rota.distanciaKm,
     duracaoMin: rota.duracaoMin,
     pedagioEstimado: rota.pedagioEstimado,
+    saidaBaseKm,
+    saidaBaseDuracaoMin,
+    pedagioSaidaEstimado,
+    retornoKm,
+    retornoDuracaoMin,
+    pedagioRetornoEstimado,
+    distanciaTotalKm,
+    custoCombustivelEstimado,
     precoSugerido,
   };
 }
@@ -169,11 +246,30 @@ export async function updateViagem(
   const payload = await buildPayload(formData);
   if (!payload) return { error: "Valor inválido." };
 
+  const { data: viagemAtual } = await supabase
+    .from("viagens")
+    .select("empresa_id, status, valor, origem, destino, data")
+    .eq("id", id)
+    .single();
+
   const { error } = await supabase.from("viagens").update(payload).eq("id", id);
   if (error) return { error: "Não foi possível salvar a viagem." };
 
+  if (viagemAtual && payload.status !== viagemAtual.status) {
+    await sincronizarLancamentoStatus(supabase, id, payload.status as ViagemStatus, {
+      ...viagemAtual,
+      valor: payload.valor,
+      origem: payload.origem,
+      destino: payload.destino,
+      data: payload.data,
+      motorista_id: payload.motorista_id,
+    });
+  }
+
   revalidatePath("/viagens");
   revalidatePath(`/viagens/${id}`);
+  revalidatePath("/financeiro");
+  revalidatePath("/");
   return { success: true, id };
 }
 
@@ -183,22 +279,14 @@ export async function updateViagemStatus(id: string, formData: FormData) {
 
   const { data: viagem } = await supabase
     .from("viagens")
-    .select("empresa_id, status, valor, origem, destino, data")
+    .select("empresa_id, status, valor, origem, destino, data, motorista_id")
     .eq("id", id)
     .single();
 
   await supabase.from("viagens").update({ status }).eq("id", id);
 
   if (viagem && status !== viagem.status) {
-    if (status === "concluida") {
-      await gerarLancamentoConclusao(supabase, id, viagem);
-    } else if (viagem.status === "concluida") {
-      await supabase
-        .from("lancamentos_financeiros")
-        .delete()
-        .eq("viagem_id", id)
-        .eq("origem", "viagem");
-    }
+    await sincronizarLancamentoStatus(supabase, id, status, viagem);
   }
 
   revalidatePath("/viagens");
@@ -207,10 +295,42 @@ export async function updateViagemStatus(id: string, formData: FormData) {
   revalidatePath("/");
 }
 
+async function sincronizarLancamentoStatus(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  viagemId: string,
+  novoStatus: ViagemStatus,
+  viagem: {
+    empresa_id: string;
+    status: ViagemStatus;
+    valor: number;
+    origem: string | null;
+    destino: string | null;
+    data: string;
+    motorista_id: string | null;
+  },
+) {
+  if (novoStatus === "concluida") {
+    await gerarLancamentoConclusao(supabase, viagemId, viagem);
+  } else if (viagem.status === "concluida") {
+    await supabase
+      .from("lancamentos_financeiros")
+      .delete()
+      .eq("viagem_id", viagemId)
+      .eq("origem", "viagem");
+  }
+}
+
 async function gerarLancamentoConclusao(
   supabase: Awaited<ReturnType<typeof createClient>>,
   viagemId: string,
-  viagem: { empresa_id: string; valor: number; origem: string | null; destino: string | null; data: string },
+  viagem: {
+    empresa_id: string;
+    valor: number;
+    origem: string | null;
+    destino: string | null;
+    data: string;
+    motorista_id: string | null;
+  },
 ) {
   const { count } = await supabase
     .from("lancamentos_financeiros")
@@ -223,6 +343,7 @@ async function gerarLancamentoConclusao(
   await supabase.from("lancamentos_financeiros").insert({
     empresa_id: viagem.empresa_id,
     viagem_id: viagemId,
+    motorista_id: viagem.motorista_id,
     tipo: "receita",
     categoria: "Frete",
     valor: viagem.valor,

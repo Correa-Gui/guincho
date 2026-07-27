@@ -13,7 +13,7 @@ export default async function EditarViagemPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: viagem }, { data: clientes }, { data: motoristas }, { data: veiculos }] =
+  const [{ data: viagem }, { data: motoristas }, { data: veiculos }] =
     await Promise.all([
       supabase
         .from("viagens")
@@ -22,7 +22,6 @@ export default async function EditarViagemPage({
         )
         .eq("id", id)
         .maybeSingle<Viagem>(),
-      supabase.from("clientes").select("id, nome").order("nome"),
       supabase.from("motoristas").select("id, nome").eq("ativo", true).order("nome"),
       supabase.from("veiculos_frota").select("id, placa, modelo").order("placa"),
     ]);
@@ -45,7 +44,6 @@ export default async function EditarViagemPage({
           <ViagemForm
             action={updateViagem.bind(null, id)}
             viagem={viagem}
-            clientes={clientes ?? []}
             motoristas={motoristas ?? []}
             veiculos={veiculos ?? []}
           />

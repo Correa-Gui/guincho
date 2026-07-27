@@ -6,8 +6,7 @@ import { createViagem } from "../actions";
 export default async function NovaViagemPage() {
   const supabase = await createClient();
 
-  const [{ data: clientes }, { data: motoristas }, { data: veiculos }] = await Promise.all([
-    supabase.from("clientes").select("id, nome").order("nome"),
+  const [{ data: motoristas }, { data: veiculos }] = await Promise.all([
     supabase.from("motoristas").select("id, nome").eq("ativo", true).order("nome"),
     supabase.from("veiculos_frota").select("id, placa, modelo").order("placa"),
   ]);
@@ -30,7 +29,6 @@ export default async function NovaViagemPage() {
         <CardContent>
           <ViagemForm
             action={createViagem}
-            clientes={clientes ?? []}
             motoristas={motoristas ?? []}
             veiculos={veiculos ?? []}
           />

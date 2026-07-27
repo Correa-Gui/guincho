@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { Plus, Car } from "lucide-react";
+import { Car, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/shared/empty-state";
+import { NovoVeiculoButton } from "@/components/frota/novo-veiculo-button";
 import {
   Table,
   TableBody,
@@ -25,7 +26,7 @@ export default async function FrotaPage() {
   const supabase = await createClient();
   const { data: veiculos } = await supabase
     .from("veiculos_frota")
-    .select("id, placa, modelo, ano, status, created_at")
+    .select("id, placa, modelo, ano, status, consumo_kml, tarifa_km, created_at")
     .order("placa")
     .returns<VeiculoFrotaCompleto[]>();
 
@@ -42,13 +43,7 @@ export default async function FrotaPage() {
             Veículos cadastrados e seus status.
           </p>
         </div>
-        <Button
-          variant="brand"
-          render={<Link href="/frota/novo" />}
-        >
-          <Plus />
-          Novo veículo
-        </Button>
+        <NovoVeiculoButton />
       </div>
 
       {lista.length === 0 ? (
@@ -56,8 +51,7 @@ export default async function FrotaPage() {
           icon={Car}
           title="Nenhum veículo cadastrado ainda"
           description="Cadastre o primeiro veículo da frota."
-          actionLabel="Cadastrar veículo"
-          actionHref="/frota/novo"
+          actionNode={<NovoVeiculoButton label="Cadastrar veículo" />}
         />
       ) : (
         <Card>
@@ -68,6 +62,7 @@ export default async function FrotaPage() {
                   <TableHead>Placa</TableHead>
                   <TableHead>Modelo</TableHead>
                   <TableHead>Ano</TableHead>
+                  <TableHead>Consumo</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
@@ -79,6 +74,9 @@ export default async function FrotaPage() {
                     <TableCell>{veiculo.modelo ?? "—"}</TableCell>
                     <TableCell>{veiculo.ano ?? "—"}</TableCell>
                     <TableCell>
+                      {veiculo.consumo_kml ? `${veiculo.consumo_kml} km/l` : "—"}
+                    </TableCell>
+                    <TableCell>
                       <Badge className={VEICULO_STATUS_BADGE_CLASS[veiculo.status]}>
                         {VEICULO_STATUS_LABEL[veiculo.status]}
                       </Badge>
@@ -88,7 +86,17 @@ export default async function FrotaPage() {
                         <Button
                           variant="outline"
                           size="sm"
+                          render={<Link href={`/frota/${veiculo.id}`} />}
+                          nativeButton={false}
+                        >
+                          <Eye />
+                          Detalhes
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           render={<Link href={`/frota/${veiculo.id}/editar`} />}
+                          nativeButton={false}
                         >
                           Editar
                         </Button>

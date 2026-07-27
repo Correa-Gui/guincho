@@ -6,10 +6,10 @@ import { createLancamento } from "../../actions";
 export default async function NovoLancamentoPage() {
   const supabase = await createClient();
 
-  const { data: viagens } = await supabase
-    .from("viagens")
-    .select("id, origem, destino")
-    .order("data", { ascending: false });
+  const [{ data: viagens }, { data: motoristas }] = await Promise.all([
+    supabase.from("viagens").select("id, origem, destino").order("data", { ascending: false }),
+    supabase.from("motoristas").select("id, nome").eq("ativo", true).order("nome"),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -27,7 +27,7 @@ export default async function NovoLancamentoPage() {
           <CardTitle>Dados do lançamento</CardTitle>
         </CardHeader>
         <CardContent>
-          <LancamentoForm action={createLancamento} viagens={viagens ?? []} />
+          <LancamentoForm action={createLancamento} viagens={viagens ?? []} motoristas={motoristas ?? []} />
         </CardContent>
       </Card>
     </div>

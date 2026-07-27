@@ -24,3 +24,10 @@ export function formatDateTime(value: string | Date): string {
 export function todayInputValue(): string {
   return new Date().toISOString().slice(0, 10);
 }
+
+/** Dias entre hoje e a data informada. Negativo quando a data já passou. */
+export function diasEntre(value: string): number {
+  const hoje = new Date(todayInputValue());
+  const data = new Date(value.length === 10 ? `${value}T00:00:00` : value);
+  return Math.round((data.getTime() - hoje.getTime()) / 86_400_000);
+}

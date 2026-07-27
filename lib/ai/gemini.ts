@@ -1,25 +1,28 @@
 import { LANCAMENTO_CATEGORIAS } from "@/lib/types";
 import {
+  DEFAULT_PROMPT_INTERPRETAR_MENSAGEM,
+  DEFAULT_PROMPT_LER_COMPROVANTE,
+  DEFAULT_PROMPT_TRANSCREVER_AUDIO,
+  INTENCOES,
+  intencaoValida,
+  toDateOrNull,
+  toItensOrEmpty,
+  toNumberOrNull,
+  toStringOrNull,
+} from "./prompts";
+import {
   AIProviderError,
   type AIProvider,
   type ComprovanteExtraido,
-  type IntencaoMensagem,
+  type ConfiguracaoIA,
   type MensagemInterpretada,
 } from "./types";
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
+// Fallback só é usado se GEMINI_MODEL não estiver setado (env ausente em algum
+// ambiente). "gemini-2.0-flash" está com quota 0 na conta atual — usar um
+// modelo validado como fallback evita quebra silenciosa em produção.
+const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
-
-const CATEGORIAS_DESPESA = LANCAMENTO_CATEGORIAS.despesa.join(", ");
-const CATEGORIAS_RECEITA = LANCAMENTO_CATEGORIAS.receita.join(", ");
-const INTENCOES: IntencaoMensagem[] = [
-  "despesa",
-  "receita",
-  "confirmacao",
-  "cancelamento",
-  "correcao",
-  "desconhecido",
-];
 
 type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
 
@@ -29,6 +32,10 @@ type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: s
  * responde em JSON mode (responseMimeType: "application/json") e o parse
  * é feito de forma segura — qualquer falha gera AIProviderError, que o
  * webhook trata como "extração falhou, pedir valor manualmente".
+ *
+ * Todos os métodos aceitam um `config?: ConfiguracaoIA` opcional
+ * (`configuracoes_ia` por empresa) para sobrescrever modelo, prompts e
+ * categorias; campos ausentes caem no padrão acima / `LANCAMENTO_CATEGORIAS`.
  */
 export class GeminiProvider implements AIProvider {
   private get apiKey(): string {
@@ -37,15 +44,16 @@ export class GeminiProvider implements AIProvider {
     return key;
   }
 
-  async transcreverAudio(arquivo: Buffer, mimeType: string): Promise<string> {
-    const prompt =
-      "Transcreva o áudio abaixo (em português do Brasil) literalmente, sem resumir. " +
-      'Responda apenas em JSON, no formato {"transcricao": "texto transcrito"}.';
+  async transcreverAudio(arquivo: Buffer, mimeType: string, config?: ConfiguracaoIA): Promise<string> {
+    const prompt = config?.promptTranscreverAudio ?? DEFAULT_PROMPT_TRANSCREVER_AUDIO;
 
-    const json = await this.callJson([
-      { text: prompt },
-      { inline_data: { mime_type: mimeType, data: arquivo.toString("base64") } },
-    ]);
+    const json = await this.callJson(
+      [
+        { text: prompt },
+        { inline_data: { mime_type: mimeType, data: arquivo.toString("base64") } },
+      ],
+      config?.modelo,
+    );
 
     const transcricao = json["transcricao"];
     if (typeof transcricao !== "string") {
@@ -54,22 +62,18 @@ export class GeminiProvider implements AIProvider {
     return transcricao.trim();
   }
 
-  async lerComprovante(imagem: Buffer, mimeType: string): Promise<ComprovanteExtraido> {
-    const prompt = `Analise a foto de comprovante/nota fiscal/recibo abaixo e extraia os dados do gasto.
-Responda apenas em JSON, no formato exato:
-{"valor": number|null, "data": "YYYY-MM-DD"|null, "categoria": string|null, "descricao": string|null, "estabelecimento": string|null}
+  async lerComprovante(imagem: Buffer, mimeType: string, config?: ConfiguracaoIA): Promise<ComprovanteExtraido> {
+    const categoriasDespesa = (config?.categoriasDespesa ?? LANCAMENTO_CATEGORIAS.despesa).join(", ");
+    const template = config?.promptLerComprovante ?? DEFAULT_PROMPT_LER_COMPROVANTE;
+    const prompt = template.replace(/\{\{CATEGORIAS_DESPESA\}\}/g, categoriasDespesa);
 
-Regras:
-- "valor": valor total pago, em reais, como número (ex: 123.45). Se não conseguir ler com confiança, use null.
-- "data": data da compra no formato YYYY-MM-DD. Se não houver data visível, use null.
-- "categoria": escolha a categoria que melhor descreve o gasto entre: ${CATEGORIAS_DESPESA}.
-- "descricao": breve descrição do que foi comprado/pago (ex: "Diesel S10", "Troca de óleo").
-- "estabelecimento": nome do estabelecimento/posto/loja, se visível.`;
-
-    const json = await this.callJson([
-      { text: prompt },
-      { inline_data: { mime_type: mimeType, data: imagem.toString("base64") } },
-    ]);
+    const json = await this.callJson(
+      [
+        { text: prompt },
+        { inline_data: { mime_type: mimeType, data: imagem.toString("base64") } },
+      ],
+      config?.modelo,
+    );
 
     return {
       valor: toNumberOrNull(json["valor"]),
@@ -80,43 +84,31 @@ Regras:
     };
   }
 
-  async interpretarMensagem(texto: string): Promise<MensagemInterpretada> {
-    const prompt = `Interprete a mensagem de WhatsApp abaixo, enviada num grupo de gestão financeira de uma transportadora.
-Responda apenas em JSON, no formato exato:
-{"intencao": string, "valor": number|null, "categoria": string|null, "data": "YYYY-MM-DD"|null, "descricao": string|null}
+  async interpretarMensagem(texto: string, config?: ConfiguracaoIA): Promise<MensagemInterpretada> {
+    const categoriasDespesa = (config?.categoriasDespesa ?? LANCAMENTO_CATEGORIAS.despesa).join(", ");
+    const categoriasReceita = (config?.categoriasReceita ?? LANCAMENTO_CATEGORIAS.receita).join(", ");
+    const template = config?.promptInterpretarMensagem ?? DEFAULT_PROMPT_INTERPRETAR_MENSAGEM;
 
-Regras:
-- "intencao": uma das opções: ${INTENCOES.join(", ")}.
-  - "despesa": a mensagem descreve um gasto (ex: "/gasto 50 combustível").
-  - "receita": a mensagem descreve um ganho/recebimento (ex: "/ganho 500 frete").
-  - "confirmacao": a mensagem confirma um lançamento pendente (ex: "sim", "confirma", "ok pode salvar").
-  - "cancelamento": a mensagem cancela/nega um lançamento pendente (ex: "não", "cancela", "errado").
-  - "correcao": a mensagem corrige um valor/dado de um lançamento pendente.
-  - "desconhecido": não se encaixa em nenhuma das opções acima.
-- "valor": valor em reais como número (ex: 50, 1234.56), se houver. Senão null.
-- "categoria": se intencao for "despesa", escolha entre: ${CATEGORIAS_DESPESA}. Se "receita", escolha entre: ${CATEGORIAS_RECEITA}. Senão null.
-- "data": se a mensagem mencionar uma data explícita, no formato YYYY-MM-DD. Senão null (assume-se hoje).
-- "descricao": breve descrição do lançamento, se houver. Senão null.
+    const instrucoes = template
+      .replace(/\{\{CATEGORIAS_DESPESA\}\}/g, categoriasDespesa)
+      .replace(/\{\{CATEGORIAS_RECEITA\}\}/g, categoriasReceita)
+      .replace(/\{\{INTENCOES\}\}/g, INTENCOES.join(", "));
 
-Mensagem: """${texto}"""`;
+    const prompt = `${instrucoes}\n\nMensagem: """${texto}"""`;
 
-    const json = await this.callJson([{ text: prompt }]);
-
-    const intencao = INTENCOES.includes(json["intencao"] as IntencaoMensagem)
-      ? (json["intencao"] as IntencaoMensagem)
-      : "desconhecido";
+    const json = await this.callJson([{ text: prompt }], config?.modelo);
 
     return {
-      intencao,
-      valor: toNumberOrNull(json["valor"]),
-      categoria: toStringOrNull(json["categoria"]),
+      intencao: intencaoValida(json["intencao"]),
       data: toDateOrNull(json["data"]),
-      descricao: toStringOrNull(json["descricao"]),
+      motorista: toStringOrNull(json["motorista"]),
+      itens: toItensOrEmpty(json["itens"]),
     };
   }
 
-  private async callJson(parts: GeminiPart[]): Promise<Record<string, unknown>> {
-    const url = `${GEMINI_API_URL}/${GEMINI_MODEL}:generateContent?key=${this.apiKey}`;
+  private async callJson(parts: GeminiPart[], modelo?: string | null): Promise<Record<string, unknown>> {
+    const model = modelo || GEMINI_MODEL;
+    const url = `${GEMINI_API_URL}/${model}:generateContent?key=${this.apiKey}`;
 
     let res: Response;
     try {
@@ -125,7 +117,14 @@ Mensagem: """${texto}"""`;
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts }],
-          generationConfig: { responseMimeType: "application/json" },
+          // thinkingBudget: 0 desativa o modo "thinking" — reduz bastante a
+          // latência (e o custo em tokens) sem perder qualidade nas tarefas
+          // de extração/transcrição, que são diretas o suficiente pra não
+          // precisar de raciocínio estendido.
+          generationConfig: {
+            responseMimeType: "application/json",
+            thinkingConfig: { thinkingBudget: 0 },
+          },
         }),
       });
     } catch (err) {
@@ -152,25 +151,4 @@ Mensagem: """${texto}"""`;
       throw new AIProviderError("Conteúdo retornado pelo Gemini não é JSON válido.", err);
     }
   }
-}
-
-function toStringOrNull(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-function toNumberOrNull(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string") {
-    const normalizado = value.replace(/[^\d,.-]/g, "").replace(",", ".");
-    const parsed = Number.parseFloat(normalizado);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return null;
-}
-
-function toDateOrNull(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
 }

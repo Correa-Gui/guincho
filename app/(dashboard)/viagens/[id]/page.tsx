@@ -82,7 +82,7 @@ export default async function ViagemDetailPage({
             Viagem de {formatDate(viagem.data)}
           </p>
         </div>
-        <Button variant="outline" render={<Link href={`/viagens/${viagem.id}/editar`} />}>
+        <Button variant="outline" render={<Link href={`/viagens/${viagem.id}/editar`} />} nativeButton={false}>
           <Pencil />
           Editar
         </Button>

@@ -43,6 +43,7 @@ export default async function AbastecimentosPage() {
         <Button
           variant="brand"
           render={<Link href="/abastecimentos/novo" />}
+          nativeButton={false}
         >
           <Plus />
           Novo abastecimento
@@ -86,6 +87,7 @@ export default async function AbastecimentosPage() {
                           variant="outline"
                           size="sm"
                           render={<Link href={`/abastecimentos/${item.id}/editar`} />}
+                          nativeButton={false}
                         >
                           Editar
                         </Button>
@@ -142,6 +144,7 @@ export default async function AbastecimentosPage() {
                           variant="outline"
                           size="sm"
                           render={<Link href={`/abastecimentos/${item.id}/editar`} />}
+                          nativeButton={false}
                         >
                           Editar
                         </Button>

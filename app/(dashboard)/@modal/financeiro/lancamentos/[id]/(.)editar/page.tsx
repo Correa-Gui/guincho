@@ -13,13 +13,16 @@ export default async function EditarLancamentoModal({
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: lancamento }, { data: viagens }] = await Promise.all([
+  const [{ data: lancamento }, { data: viagens }, { data: motoristas }] = await Promise.all([
     supabase
       .from("lancamentos_financeiros")
-      .select("id, viagem_id, tipo, categoria, valor, descricao, data, created_at, viagens(id, origem, destino)")
+      .select(
+        "id, viagem_id, motorista_id, tipo, categoria, valor, descricao, data, created_at, viagens(id, origem, destino), motoristas(nome)",
+      )
       .eq("id", id)
       .maybeSingle<LancamentoFinanceiro>(),
     supabase.from("viagens").select("id, origem, destino").order("data", { ascending: false }),
+    supabase.from("motoristas").select("id, nome").eq("ativo", true).order("nome"),
   ]);
 
   if (!lancamento) notFound();
@@ -30,6 +33,7 @@ export default async function EditarLancamentoModal({
         action={updateLancamento.bind(null, id)}
         lancamento={lancamento}
         viagens={viagens ?? []}
+        motoristas={motoristas ?? []}
       />
     </Modal>
   );

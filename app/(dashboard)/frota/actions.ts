@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { parseValor } from "@/lib/parse";
 import type { VeiculoStatus } from "@/lib/types";
 
 export type FrotaFormState = { error?: string; success?: boolean };
@@ -14,11 +15,21 @@ function buildPayload(formData: FormData) {
   const ano = anoRaw ? Number(anoRaw) : null;
   if (ano !== null && !Number.isInteger(ano)) return null;
 
+  const consumoRaw = (formData.get("consumo_kml") as string)?.trim();
+  const consumoKml = consumoRaw ? parseValor(consumoRaw) : 0;
+  if (consumoKml === null) return null;
+
+  const tarifaKmRaw = (formData.get("tarifa_km") as string)?.trim();
+  const tarifaKm = tarifaKmRaw ? parseValor(tarifaKmRaw) : 0;
+  if (tarifaKm === null) return null;
+
   return {
     placa,
     modelo: (formData.get("modelo") as string) || null,
     ano,
     status: (formData.get("status") as VeiculoStatus) || "ativo",
+    consumo_kml: consumoKml > 0 ? consumoKml : null,
+    tarifa_km: tarifaKm > 0 ? tarifaKm : null,
   };
 }
 
@@ -44,7 +55,10 @@ export async function createVeiculo(
     .from("veiculos_frota")
     .insert({ ...payload, empresa_id: usuario.empresa_id });
 
-  if (error) return { error: "Não foi possível salvar o veículo." };
+  if (error) {
+    console.error("[createVeiculo] supabase error:", error);
+    return { error: "Não foi possível salvar o veículo." };
+  }
 
   revalidatePath("/frota");
   return { success: true };

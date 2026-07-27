@@ -44,6 +44,7 @@ export default async function PatioPage() {
         <Button
           variant="brand"
           render={<Link href="/patio/novo" />}
+          nativeButton={false}
         >
           <Plus />
           Nova entrada

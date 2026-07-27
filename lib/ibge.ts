@@ -60,22 +60,26 @@ export async function getCoordsComFallback(
   url.searchParams.set("format", "json");
   url.searchParams.set("limit", "1");
 
-  const res = await fetch(url, {
-    headers: { "User-Agent": "GuinchoFin/1.0 (contato@guinchofin.app)" },
-  });
-  if (!res.ok) return null;
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": "GuinchoFin/1.0 (contato@guinchofin.app)" },
+    });
+    if (!res.ok) return null;
 
-  const results = (await res.json()) as { lat: string; lon: string }[];
-  const first = results[0];
-  if (!first) return null;
+    const results = (await res.json()) as { lat: string; lon: string }[];
+    const first = results[0];
+    if (!first) return null;
 
-  const lat = Number(first.lat);
-  const lon = Number(first.lon);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    const lat = Number(first.lat);
+    const lon = Number(first.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
 
-  await supabase
-    .from("municipios_coords_fallback")
-    .insert({ ibge_codigo: ibge, lat, lon, fonte: "nominatim" });
+    await supabase
+      .from("municipios_coords_fallback")
+      .insert({ ibge_codigo: ibge, lat, lon, fonte: "nominatim" });
 
-  return { lat, lon, fonte: "nominatim" };
+    return { lat, lon, fonte: "nominatim" };
+  } catch {
+    return null;
+  }
 }

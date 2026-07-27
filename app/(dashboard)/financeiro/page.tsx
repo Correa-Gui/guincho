@@ -1,8 +1,9 @@
+import { Wallet, Receipt, Repeat, Pause, Play } from "lucide-react";
 import Link from "next/link";
-import { Plus, Wallet, Receipt, Repeat, Pause, Play } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { NovoLancamentoButton, NovaContaButton, NovaContaFixaButton } from "@/components/financeiro/financeiro-buttons";
 import { EmptyState } from "@/components/shared/empty-state";
 import {
   Table,
@@ -13,84 +14,221 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DeleteButton } from "@/components/shared/delete-button";
+import { TableFilters } from "@/components/shared/table-filters";
+import { PaginationControls } from "@/components/shared/pagination-controls";
 import { createClient } from "@/lib/supabase/server";
 import { gerarLancamentosDoMes } from "@/lib/contas-fixas";
 import { formatCurrency, formatDate } from "@/lib/format";
 import {
   CONTA_STATUS_BADGE_CLASS,
   CONTA_STATUS_LABEL,
+  LANCAMENTO_CATEGORIAS,
   LANCAMENTO_TIPO_BADGE_CLASS,
   LANCAMENTO_TIPO_LABEL,
   type ContaAReceber,
   type ContaFixa,
   type LancamentoFinanceiro,
+  type LancamentoTipo,
 } from "@/lib/types";
 import { deleteConta, deleteLancamento, deleteContaFixa, toggleContaFixa } from "./actions";
 
-export default async function FinanceiroPage() {
+const PAGE_SIZE = 10;
+
+type SearchParams = Record<string, string | string[] | undefined>;
+
+function param(searchParams: SearchParams, key: string) {
+  const value = searchParams[key];
+  return (Array.isArray(value) ? value[0] : value) ?? "";
+}
+
+function parsePage(value: string) {
+  const page = Number(value);
+  return Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+}
+
+function buildHref(searchParams: SearchParams, pageParam: string, page: number) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(searchParams)) {
+    const first = Array.isArray(value) ? value[0] : value;
+    if (first) params.set(key, first);
+  }
+  params.set(pageParam, String(page));
+  return `?${params.toString()}`;
+}
+
+function hiddenParams(searchParams: SearchParams, exclude: string[]) {
+  const hidden: Record<string, string> = {};
+  for (const [key, value] of Object.entries(searchParams)) {
+    if (exclude.includes(key)) continue;
+    const first = Array.isArray(value) ? value[0] : value;
+    if (first) hidden[key] = first;
+  }
+  return hidden;
+}
+
+export default async function FinanceiroPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const sp = await searchParams;
   const supabase = await createClient();
 
   await gerarLancamentosDoMes(supabase);
 
-  const [{ data: lancamentos }, { data: contas }, { data: contasFixas }] = await Promise.all([
-    supabase
-      .from("lancamentos_financeiros")
-      .select("id, viagem_id, tipo, categoria, valor, descricao, data, created_at, viagens(id, origem, destino)")
-      .order("data", { ascending: false })
-      .returns<LancamentoFinanceiro[]>(),
-    supabase
-      .from("contas_a_receber")
-      .select("id, viagem_id, cliente_id, valor, vencimento, status, created_at, clientes(nome), viagens(id, origem, destino)")
-      .order("vencimento", { ascending: true })
-      .returns<ContaAReceber[]>(),
+  const lancPage = parsePage(param(sp, "lpag"));
+  const lancTipo = param(sp, "ltipo");
+  const lancCategoria = param(sp, "lcat");
+
+  const contaPage = parsePage(param(sp, "cpag"));
+  const contaStatus = param(sp, "cstatus");
+
+  const fixaPage = parsePage(param(sp, "fpag"));
+  const fixaTipo = param(sp, "ftipo");
+  const fixaAtivo = param(sp, "fativo");
+
+  let lancQuery = supabase
+    .from("lancamentos_financeiros")
+    .select(
+      "id, viagem_id, motorista_id, tipo, categoria, valor, descricao, data, created_at, viagens(id, origem, destino), motoristas(nome)",
+      { count: "exact" },
+    )
+    .order("data", { ascending: false });
+  if (lancTipo) lancQuery = lancQuery.eq("tipo", lancTipo);
+  if (lancCategoria) lancQuery = lancQuery.eq("categoria", lancCategoria);
+  const lancFrom = (lancPage - 1) * PAGE_SIZE;
+  lancQuery = lancQuery.range(lancFrom, lancFrom + PAGE_SIZE - 1);
+
+  let contaQuery = supabase
+    .from("contas_a_receber")
+    .select(
+      "id, viagem_id, cliente_id, valor, vencimento, status, created_at, clientes(nome), viagens(id, origem, destino)",
+      { count: "exact" },
+    )
+    .order("vencimento", { ascending: true });
+  if (contaStatus) contaQuery = contaQuery.eq("status", contaStatus);
+  const contaFrom = (contaPage - 1) * PAGE_SIZE;
+  contaQuery = contaQuery.range(contaFrom, contaFrom + PAGE_SIZE - 1);
+
+  let fixaQuery = supabase
+    .from("contas_fixas")
+    .select("id, descricao, tipo, categoria, valor, dia_vencimento, ativo, created_at", {
+      count: "exact",
+    })
+    .order("dia_vencimento", { ascending: true });
+  if (fixaTipo) fixaQuery = fixaQuery.eq("tipo", fixaTipo);
+  if (fixaAtivo) fixaQuery = fixaQuery.eq("ativo", fixaAtivo === "sim");
+  const fixaFrom = (fixaPage - 1) * PAGE_SIZE;
+  fixaQuery = fixaQuery.range(fixaFrom, fixaFrom + PAGE_SIZE - 1);
+
+  const [
+    { data: lancamentos, count: lancCount },
+    { data: contas, count: contaCount },
+    { data: contasFixas, count: fixaCount },
+    { data: fixasAtivas },
+    { data: viagensRef },
+    { data: clientes },
+    { data: motoristas },
+  ] = await Promise.all([
+    lancQuery.returns<LancamentoFinanceiro[]>(),
+    contaQuery.returns<ContaAReceber[]>(),
+    fixaQuery.returns<ContaFixa[]>(),
     supabase
       .from("contas_fixas")
-      .select("id, descricao, tipo, categoria, valor, dia_vencimento, ativo, created_at")
-      .order("dia_vencimento", { ascending: true })
-      .returns<ContaFixa[]>(),
+      .select("tipo, valor")
+      .eq("ativo", true)
+      .returns<{ tipo: LancamentoTipo; valor: number }[]>(),
+    supabase
+      .from("viagens")
+      .select("id, origem, destino")
+      .order("data", { ascending: false }),
+    supabase.from("clientes").select("id, nome").order("nome"),
+    supabase.from("motoristas").select("id, nome").eq("ativo", true).order("nome"),
   ]);
 
   const listaLancamentos = lancamentos ?? [];
   const listaContas = contas ?? [];
   const listaContasFixas = contasFixas ?? [];
 
-  const totalFixoDespesa = listaContasFixas
-    .filter((c) => c.ativo && c.tipo === "despesa")
+  const lancTotalPages = Math.max(1, Math.ceil((lancCount ?? 0) / PAGE_SIZE));
+  const contaTotalPages = Math.max(1, Math.ceil((contaCount ?? 0) / PAGE_SIZE));
+  const fixaTotalPages = Math.max(1, Math.ceil((fixaCount ?? 0) / PAGE_SIZE));
+
+  const totalFixoDespesa = (fixasAtivas ?? [])
+    .filter((c) => c.tipo === "despesa")
     .reduce((total, c) => total + c.valor, 0);
-  const totalFixoReceita = listaContasFixas
-    .filter((c) => c.ativo && c.tipo === "receita")
+  const totalFixoReceita = (fixasAtivas ?? [])
+    .filter((c) => c.tipo === "receita")
     .reduce((total, c) => total + c.valor, 0);
+
+  const categoriaOptions = Array.from(
+    new Set([...LANCAMENTO_CATEGORIAS.receita, ...LANCAMENTO_CATEGORIAS.despesa]),
+  );
+
+  const lancFiltered = Boolean(lancTipo || lancCategoria);
+  const contaFiltered = Boolean(contaStatus);
+  const fixaFiltered = Boolean(fixaTipo || fixaAtivo);
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-          Financeiro
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Lançamentos de caixa e contas a receber.
-        </p>
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            Financeiro
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Lançamentos de caixa e contas a receber.
+          </p>
+        </div>
+        <Button variant="outline" render={<Link href="/financeiro/historico" />} nativeButton={false}>
+          Histórico mensal
+        </Button>
       </div>
 
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
           <CardTitle>Lançamentos</CardTitle>
-          <Button
-            size="sm"
-            variant="brand"
-            render={<Link href="/financeiro/lancamentos/novo" />}
-          >
-            <Plus />
-            Novo lançamento
-          </Button>
+          <NovoLancamentoButton viagens={viagensRef ?? []} motoristas={motoristas ?? []} />
         </CardHeader>
         <CardContent className="px-0">
+          <TableFilters
+            hidden={hiddenParams(sp, ["lpag", "ltipo", "lcat"])}
+            selects={[
+              {
+                name: "ltipo",
+                label: "Tipo",
+                value: lancTipo,
+                options: [
+                  { value: "", label: "Todos" },
+                  { value: "receita", label: "Receita" },
+                  { value: "despesa", label: "Despesa" },
+                ],
+              },
+              {
+                name: "lcat",
+                label: "Categoria",
+                value: lancCategoria,
+                options: [
+                  { value: "", label: "Todas" },
+                  ...categoriaOptions.map((categoria) => ({ value: categoria, label: categoria })),
+                ],
+              },
+            ]}
+          />
           {listaLancamentos.length === 0 ? (
             <EmptyState
               bare
               icon={Wallet}
-              title="Nenhum lançamento cadastrado ainda"
-              description="Registre receitas e despesas para acompanhar o caixa."
+              title={
+                lancFiltered
+                  ? "Nenhum lançamento encontrado para os filtros selecionados"
+                  : "Nenhum lançamento cadastrado ainda"
+              }
+              description={
+                lancFiltered
+                  ? "Tente ajustar os filtros para ver outros lançamentos."
+                  : "Registre receitas e despesas para acompanhar o caixa."
+              }
             />
           ) : (
             <>
@@ -107,7 +245,10 @@ export default async function FinanceiroPage() {
                           {LANCAMENTO_TIPO_LABEL[lancamento.tipo]}
                         </Badge>
                       </div>
-                      <div className="text-sm text-muted-foreground">{lancamento.categoria}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {lancamento.categoria}
+                        {lancamento.motoristas?.nome ? ` · ${lancamento.motoristas.nome}` : ""}
+                      </div>
                       {lancamento.descricao ? (
                         <div className="truncate text-xs text-muted-foreground">
                           {lancamento.descricao}
@@ -125,6 +266,7 @@ export default async function FinanceiroPage() {
                             variant="outline"
                             size="sm"
                             render={<Link href={`/financeiro/lancamentos/${lancamento.id}/editar`} />}
+                            nativeButton={false}
                           >
                             Editar
                           </Button>
@@ -146,6 +288,7 @@ export default async function FinanceiroPage() {
                     <TableHead>Data</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead>Categoria</TableHead>
+                    <TableHead>Motorista</TableHead>
                     <TableHead>Descrição</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
@@ -161,6 +304,9 @@ export default async function FinanceiroPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>{lancamento.categoria}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {lancamento.motoristas?.nome ?? "—"}
+                      </TableCell>
                       <TableCell className="max-w-xs truncate text-muted-foreground">
                         {lancamento.descricao ?? "—"}
                       </TableCell>
@@ -176,6 +322,7 @@ export default async function FinanceiroPage() {
                             variant="outline"
                             size="sm"
                             render={<Link href={`/financeiro/lancamentos/${lancamento.id}/editar`} />}
+                            nativeButton={false}
                           >
                             Editar
                           </Button>
@@ -191,28 +338,50 @@ export default async function FinanceiroPage() {
               </Table>
             </>
           )}
+          <PaginationControls
+            page={lancPage}
+            totalPages={lancTotalPages}
+            buildHref={(page) => buildHref(sp, "lpag", page)}
+          />
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
           <CardTitle>Contas a receber</CardTitle>
-          <Button
-            size="sm"
-            variant="brand"
-            render={<Link href="/financeiro/contas/nova" />}
-          >
-            <Plus />
-            Nova conta
-          </Button>
+          <NovaContaButton clientes={clientes ?? []} viagens={viagensRef ?? []} />
         </CardHeader>
         <CardContent className="px-0">
+          <TableFilters
+            hidden={hiddenParams(sp, ["cpag", "cstatus"])}
+            selects={[
+              {
+                name: "cstatus",
+                label: "Status",
+                value: contaStatus,
+                options: [
+                  { value: "", label: "Todos" },
+                  { value: "pendente", label: "Pendente" },
+                  { value: "pago", label: "Pago" },
+                  { value: "atrasado", label: "Atrasado" },
+                ],
+              },
+            ]}
+          />
           {listaContas.length === 0 ? (
             <EmptyState
               bare
               icon={Receipt}
-              title="Nenhuma conta a receber cadastrada ainda"
-              description="Contas vinculadas a viagens aparecerão aqui."
+              title={
+                contaFiltered
+                  ? "Nenhuma conta encontrada para os filtros selecionados"
+                  : "Nenhuma conta a receber cadastrada ainda"
+              }
+              description={
+                contaFiltered
+                  ? "Tente ajustar os filtros para ver outras contas."
+                  : "Contas vinculadas a viagens aparecerão aqui."
+              }
             />
           ) : (
             <>
@@ -241,6 +410,7 @@ export default async function FinanceiroPage() {
                             variant="outline"
                             size="sm"
                             render={<Link href={`/financeiro/contas/${conta.id}/editar`} />}
+                            nativeButton={false}
                           >
                             Editar
                           </Button>
@@ -285,6 +455,7 @@ export default async function FinanceiroPage() {
                             variant="outline"
                             size="sm"
                             render={<Link href={`/financeiro/contas/${conta.id}/editar`} />}
+                            nativeButton={false}
                           >
                             Editar
                           </Button>
@@ -300,6 +471,11 @@ export default async function FinanceiroPage() {
               </Table>
             </>
           )}
+          <PaginationControls
+            page={contaPage}
+            totalPages={contaTotalPages}
+            buildHref={(page) => buildHref(sp, "cpag", page)}
+          />
         </CardContent>
       </Card>
 
@@ -307,25 +483,55 @@ export default async function FinanceiroPage() {
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
           <div>
             <CardTitle>Contas fixas</CardTitle>
-            {listaContasFixas.length > 0 ? (
+            {totalFixoDespesa > 0 || totalFixoReceita > 0 ? (
               <p className="mt-1 text-sm text-muted-foreground">
                 Gastos fixos: {formatCurrency(totalFixoDespesa)}/mês
                 {totalFixoReceita > 0 ? ` · Receitas fixas: ${formatCurrency(totalFixoReceita)}/mês` : ""}
               </p>
             ) : null}
           </div>
-          <Button size="sm" variant="brand" render={<Link href="/financeiro/fixas/nova" />}>
-            <Plus />
-            Nova conta fixa
-          </Button>
+          <NovaContaFixaButton />
         </CardHeader>
         <CardContent className="px-0">
+          <TableFilters
+            hidden={hiddenParams(sp, ["fpag", "ftipo", "fativo"])}
+            selects={[
+              {
+                name: "ftipo",
+                label: "Tipo",
+                value: fixaTipo,
+                options: [
+                  { value: "", label: "Todos" },
+                  { value: "receita", label: "Receita" },
+                  { value: "despesa", label: "Despesa" },
+                ],
+              },
+              {
+                name: "fativo",
+                label: "Status",
+                value: fixaAtivo,
+                options: [
+                  { value: "", label: "Todos" },
+                  { value: "sim", label: "Ativas" },
+                  { value: "nao", label: "Pausadas" },
+                ],
+              },
+            ]}
+          />
           {listaContasFixas.length === 0 ? (
             <EmptyState
               bare
               icon={Repeat}
-              title="Nenhuma conta fixa cadastrada ainda"
-              description="Cadastre aluguel, internet e outras contas recorrentes para acompanhar seus gastos fixos mensais."
+              title={
+                fixaFiltered
+                  ? "Nenhuma conta fixa encontrada para os filtros selecionados"
+                  : "Nenhuma conta fixa cadastrada ainda"
+              }
+              description={
+                fixaFiltered
+                  ? "Tente ajustar os filtros para ver outras contas fixas."
+                  : "Cadastre aluguel, internet e outras contas recorrentes para acompanhar seus gastos fixos mensais."
+              }
             />
           ) : (
             <>
@@ -357,6 +563,7 @@ export default async function FinanceiroPage() {
                             variant="outline"
                             size="sm"
                             render={<Link href={`/financeiro/fixas/${conta.id}/editar`} />}
+                            nativeButton={false}
                           >
                             Editar
                           </Button>
@@ -432,6 +639,7 @@ export default async function FinanceiroPage() {
                             variant="outline"
                             size="sm"
                             render={<Link href={`/financeiro/fixas/${conta.id}/editar`} />}
+                            nativeButton={false}
                           >
                             Editar
                           </Button>
@@ -447,6 +655,11 @@ export default async function FinanceiroPage() {
               </Table>
             </>
           )}
+          <PaginationControls
+            page={fixaPage}
+            totalPages={fixaTotalPages}
+            buildHref={(page) => buildHref(sp, "fpag", page)}
+          />
         </CardContent>
       </Card>
     </div>

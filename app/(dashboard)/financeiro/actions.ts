@@ -33,6 +33,7 @@ function buildLancamentoPayload(formData: FormData) {
 
   return {
     viagem_id: (formData.get("viagem_id") as string) || null,
+    motorista_id: (formData.get("motorista_id") as string) || null,
     tipo: (formData.get("tipo") as LancamentoTipo) || "receita",
     categoria: (formData.get("categoria") as string) || "Outros",
     valor,
