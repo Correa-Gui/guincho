@@ -41,7 +41,7 @@ Regras:
 
 export const DEFAULT_PROMPT_INTERPRETAR_MENSAGEM = `Interprete a mensagem de WhatsApp abaixo, enviada num grupo de gestão financeira de uma transportadora.
 Responda apenas em JSON, no formato exato:
-{"intencao": string, "data": "YYYY-MM-DD"|null, "motorista": string|null, "itens": [{"tipo": "receita"|"despesa", "valor": number|null, "categoria": string|null, "data": "YYYY-MM-DD"|null, "descricao": string|null, "origem": string|null, "destino": string|null, "segurado": string|null, "placa": string|null}]}
+{"intencao": string, "data": "YYYY-MM-DD"|null, "motorista": string|null, "itens": [{"tipo": "receita"|"despesa", "valor": number|null, "categoria": string|null, "data": "YYYY-MM-DD"|null, "descricao": string|null, "origem": string|null, "destino": string|null, "segurado": string|null, "seguradora": string|null, "placa": string|null}]}
 
 Regras gerais:
 - "intencao": uma das opções: {{INTENCOES}}.
@@ -65,36 +65,40 @@ Para cada item em "itens":
 - "descricao": breve descrição do lançamento (ex: "almoço", "Viagem Jaboticabal -> Taiúçu"). Senão null.
 - "origem" e "destino": se o item descrever um trajeto/serviço entre dois lugares (ex: "socorro de X até Y", "frete de X pra Y", "viagem de X a Y"), preencha com os nomes dos lugares mencionados (cidades), sem prefixos como "de"/"até". Se a mensagem não mencionar um trajeto, ambos null.
 - "segurado": se a mensagem citar explicitamente o nome do segurado/cliente dono do veículo guinchado (ex: "segurado: Maria Silva", "segurada Maria", "cliente: João"), extraia só o nome. Senão null.
+- "seguradora": se a mensagem citar explicitamente o nome da seguradora responsável pelo sinistro (ex: "seguradora: Porto Seguro", "seguradora Azul Seguros"), extraia só o nome — é diferente do segurado (a seguradora é a empresa, o segurado é a pessoa dona do veículo). Senão null.
 - "placa": se a mensagem citar a placa do veículo do cliente guinchado (ex: "placa ABC1D23", "placa: ABC-1234"), extraia exatamente como veio na mensagem (não normalize). Senão null.
 
 Exemplos:
 
 Mensagem: "/ganho 500 frete de Ribeirão Preto pra Campinas"
-Resposta: {"intencao": "receita", "data": null, "motorista": null, "itens": [{"tipo": "receita", "valor": 500, "categoria": "Frete", "data": null, "descricao": "Frete Ribeirão Preto -> Campinas", "origem": "Ribeirão Preto", "destino": "Campinas", "segurado": null, "placa": null}]}
+Resposta: {"intencao": "receita", "data": null, "motorista": null, "itens": [{"tipo": "receita", "valor": 500, "categoria": "Frete", "data": null, "descricao": "Frete Ribeirão Preto -> Campinas", "origem": "Ribeirão Preto", "destino": "Campinas", "segurado": null, "seguradora": null, "placa": null}]}
 
 Mensagem: "/gasto 80 no posto, abasteci o caminhão"
-Resposta: {"intencao": "despesa", "data": null, "motorista": null, "itens": [{"tipo": "despesa", "valor": 80, "categoria": "Combustível", "data": null, "descricao": "Abastecimento", "origem": null, "destino": null, "segurado": null, "placa": null}]}
+Resposta: {"intencao": "despesa", "data": null, "motorista": null, "itens": [{"tipo": "despesa", "valor": 80, "categoria": "Combustível", "data": null, "descricao": "Abastecimento", "origem": null, "destino": null, "segurado": null, "seguradora": null, "placa": null}]}
 
 Mensagem: "Fiz a viagem de Jaboticabal a Taiúçu, recebi 300 de frete e gastei 40 de almoço"
-Resposta: {"intencao": "receita", "data": null, "motorista": null, "itens": [{"tipo": "receita", "valor": 300, "categoria": "Frete", "data": null, "descricao": "Viagem Jaboticabal -> Taiúçu", "origem": "Jaboticabal", "destino": "Taiúçu", "segurado": null, "placa": null}, {"tipo": "despesa", "valor": 40, "categoria": "Alimentação", "data": null, "descricao": "Almoço", "origem": null, "destino": null, "segurado": null, "placa": null}]}
+Resposta: {"intencao": "receita", "data": null, "motorista": null, "itens": [{"tipo": "receita", "valor": 300, "categoria": "Frete", "data": null, "descricao": "Viagem Jaboticabal -> Taiúçu", "origem": "Jaboticabal", "destino": "Taiúçu", "segurado": null, "seguradora": null, "placa": null}, {"tipo": "despesa", "valor": 40, "categoria": "Alimentação", "data": null, "descricao": "Almoço", "origem": null, "destino": null, "segurado": null, "seguradora": null, "placa": null}]}
 
 Mensagem: "Fiz um socorro de Jaboticabal até Taiúçu, recebi 350"
-Resposta: {"intencao": "receita", "data": null, "motorista": null, "itens": [{"tipo": "receita", "valor": 350, "categoria": "Guincho", "data": null, "descricao": "Socorro Jaboticabal -> Taiúçu", "origem": "Jaboticabal", "destino": "Taiúçu", "segurado": null, "placa": null}]}
+Resposta: {"intencao": "receita", "data": null, "motorista": null, "itens": [{"tipo": "receita", "valor": 350, "categoria": "Guincho", "data": null, "descricao": "Socorro Jaboticabal -> Taiúçu", "origem": "Jaboticabal", "destino": "Taiúçu", "segurado": null, "seguradora": null, "placa": null}]}
 
 Mensagem: "paguei 60 de pedágio, 35 de almoço e 100 de manutenção no pneu"
-Resposta: {"intencao": "despesa", "data": null, "motorista": null, "itens": [{"tipo": "despesa", "valor": 60, "categoria": "Pedágio", "data": null, "descricao": "Pedágio", "origem": null, "destino": null, "segurado": null, "placa": null}, {"tipo": "despesa", "valor": 35, "categoria": "Alimentação", "data": null, "descricao": "Almoço", "origem": null, "destino": null, "segurado": null, "placa": null}, {"tipo": "despesa", "valor": 100, "categoria": "Manutenção", "data": null, "descricao": "Conserto do pneu", "origem": null, "destino": null, "segurado": null, "placa": null}]}
+Resposta: {"intencao": "despesa", "data": null, "motorista": null, "itens": [{"tipo": "despesa", "valor": 60, "categoria": "Pedágio", "data": null, "descricao": "Pedágio", "origem": null, "destino": null, "segurado": null, "seguradora": null, "placa": null}, {"tipo": "despesa", "valor": 35, "categoria": "Alimentação", "data": null, "descricao": "Almoço", "origem": null, "destino": null, "segurado": null, "seguradora": null, "placa": null}, {"tipo": "despesa", "valor": 100, "categoria": "Manutenção", "data": null, "descricao": "Conserto do pneu", "origem": null, "destino": null, "segurado": null, "seguradora": null, "placa": null}]}
 
 Mensagem: "motorista: Cicero, recebi 400 de frete de Franca pra Uberaba"
-Resposta: {"intencao": "receita", "data": null, "motorista": "Cicero", "itens": [{"tipo": "receita", "valor": 400, "categoria": "Frete", "data": null, "descricao": "Frete Franca -> Uberaba", "origem": "Franca", "destino": "Uberaba", "segurado": null, "placa": null}]}
+Resposta: {"intencao": "receita", "data": null, "motorista": "Cicero", "itens": [{"tipo": "receita", "valor": 400, "categoria": "Frete", "data": null, "descricao": "Frete Franca -> Uberaba", "origem": "Franca", "destino": "Uberaba", "segurado": null, "seguradora": null, "placa": null}]}
 
 Mensagem: "Socorro de Jaboticabal até Taiúçu, recebi 350. Segurado: Maria Silva, placa ABC1D23"
-Resposta: {"intencao": "receita", "data": null, "motorista": null, "itens": [{"tipo": "receita", "valor": 350, "categoria": "Guincho", "data": null, "descricao": "Socorro Jaboticabal -> Taiúçu", "origem": "Jaboticabal", "destino": "Taiúçu", "segurado": "Maria Silva", "placa": "ABC1D23"}]}
+Resposta: {"intencao": "receita", "data": null, "motorista": null, "itens": [{"tipo": "receita", "valor": 350, "categoria": "Guincho", "data": null, "descricao": "Socorro Jaboticabal -> Taiúçu", "origem": "Jaboticabal", "destino": "Taiúçu", "segurado": "Maria Silva", "seguradora": null, "placa": "ABC1D23"}]}
+
+Mensagem: "Socorro de Jaboticabal até Taiúçu, recebi 350. Seguradora: Porto Seguro, segurado: João, placa ABC1D23"
+Resposta: {"intencao": "receita", "data": null, "motorista": null, "itens": [{"tipo": "receita", "valor": 350, "categoria": "Guincho", "data": null, "descricao": "Socorro Jaboticabal -> Taiúçu", "origem": "Jaboticabal", "destino": "Taiúçu", "segurado": "João", "seguradora": "Porto Seguro", "placa": "ABC1D23"}]}
 
 Mensagem: "sim"
 Resposta: {"intencao": "confirmacao", "data": null, "motorista": null, "itens": []}
 
 Mensagem: "o almoço foi 50"
-Resposta: {"intencao": "correcao", "data": null, "motorista": null, "itens": [{"tipo": "despesa", "valor": 50, "categoria": "Alimentação", "data": null, "descricao": null, "origem": null, "destino": null, "segurado": null, "placa": null}]}`;
+Resposta: {"intencao": "correcao", "data": null, "motorista": null, "itens": [{"tipo": "despesa", "valor": 50, "categoria": "Alimentação", "data": null, "descricao": null, "origem": null, "destino": null, "segurado": null, "seguradora": null, "placa": null}]}`;
 
 export function toStringOrNull(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -137,6 +141,7 @@ export function toItensOrEmpty(value: unknown): ItemLancamento[] {
       origem: toStringOrNull(obj["origem"]),
       destino: toStringOrNull(obj["destino"]),
       segurado: toStringOrNull(obj["segurado"]),
+      seguradora: toStringOrNull(obj["seguradora"]),
       placaCliente: toStringOrNull(obj["placa"]),
     });
   }

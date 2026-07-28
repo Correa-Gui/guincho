@@ -35,6 +35,8 @@ export type ItemLancamento = {
   destino: string | null;
   /** Nome do segurado/cliente dono do veículo guinchado (ex: "segurado: Maria Silva"). Senão null. */
   segurado: string | null;
+  /** Nome da seguradora responsável pelo sinistro (ex: "seguradora: Porto Seguro"), distinta do segurado. Senão null. */
+  seguradora: string | null;
   /** Placa do veículo do cliente guinchado, como veio na mensagem (sem normalizar). Senão null. */
   placaCliente: string | null;
 };

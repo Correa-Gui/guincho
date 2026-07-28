@@ -63,8 +63,14 @@ export type Viagem = {
   observacoes: string | null;
   /** Nome do segurado/cliente dono do veículo guinchado. */
   segurado: string | null;
+  /** Nome da seguradora responsável pelo sinistro, distinta do segurado. */
+  seguradora: string | null;
   /** Placa do veículo do cliente guinchado (normalizada: maiúscula, sem espaço). */
   placa_cliente: string | null;
+  km_inicial: number | null;
+  km_final: number | null;
+  /** Derivado (km_final - km_inicial), calculado no banco. */
+  km_rodado: number | null;
   created_at: string;
   clientes: { nome: string } | null;
   motoristas: { nome: string } | null;
@@ -413,6 +419,8 @@ export type ItemRascunho = {
   destino?: string | null;
   /** Nome do segurado/cliente dono do veículo guinchado. */
   segurado?: string | null;
+  /** Nome da seguradora responsável pelo sinistro, distinta do segurado. */
+  seguradora?: string | null;
   /** Placa do veículo do cliente, já normalizada (maiúscula, sem espaço). */
   placaCliente?: string | null;
 };

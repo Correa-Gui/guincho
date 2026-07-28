@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getAIProvider, AIProviderError, buscarConfiguracaoIA, categoriasDaConfiguracao, type ConfiguracaoIA } from "@/lib/ai";
 import { LANCAMENTO_TIPO_LABEL, type ItemRascunho, type LancamentoTipo } from "@/lib/types";
-import { formatCurrency, formatDate, validarPlaca } from "@/lib/format";
+import { formatCurrency, formatDate, formatKm, validarPlaca } from "@/lib/format";
 import { resolverLocalizacao } from "@/lib/enderecos";
 import { getRota } from "@/lib/rotas";
 import { baixarMidiaMensagem, enviarMensagemTexto, numeroDoJid } from "./evolution";
@@ -26,7 +26,15 @@ const COMANDOS: Record<string, LancamentoTipo> = {
 };
 
 const REGEX_CONFIRMA = /^(sim|s|confirma(do)?|confirmar|isso|correto|certo|ok)\b/i;
-const REGEX_CANCELA = /^(n[aã]o|n|cancela(r)?|errado|apaga(r)?|descarta(r)?)\b/i;
+const REGEX_CANCELA = /^(n[aã]o|n|cancela(r)?|errado|apaga(r)?|descarta(r)?|pular|depois|agora n[aã]o)\b/i;
+
+/** Extrai só os dígitos do texto e converte pra km (inteiro). Ex: "45.890 km" -> 45890. */
+function parseKmInteiro(texto: string): number | null {
+  const digitos = texto.replace(/\D/g, "");
+  if (!digitos) return null;
+  const valor = Number(digitos);
+  return Number.isFinite(valor) ? valor : null;
+}
 
 /** Overrides de IA + categorias efetivas da empresa, resolvidos 1x por mensagem. */
 type IAContext = {
@@ -41,6 +49,11 @@ type RascunhoRow = {
   payload: RascunhoPayload;
   media_url: string | null;
   motorista_id: string | null;
+};
+
+type PerguntaKmRow = {
+  id: string;
+  viagem_id: string;
 };
 
 /**
@@ -226,16 +239,30 @@ async function processarTexto(
   if (!textoLimpo) return;
 
   const match = textoLimpo.match(/^(\/\w+)\s*([\s\S]*)$/);
-  if (match && COMANDOS[match[1].toLowerCase()]) {
-    await processarComando(supabase, empresaId, key, participant, COMANDOS[match[1].toLowerCase()], match[2].trim(), ia);
+  if (match) {
+    const comando = match[1].toLowerCase();
+    // /encerrar não gera lançamento (não tem tipo em COMANDOS), por isso fica fora do mapa.
+    if (comando === "/encerrar") {
+      await processarEncerramento(supabase, empresaId, key, participant, match[2].trim());
+      return;
+    }
+    if (COMANDOS[comando]) {
+      await processarComando(supabase, empresaId, key, participant, COMANDOS[comando], match[2].trim(), ia);
+      return;
+    }
+  }
+
+  const rascunho = await buscarRascunhoPendente(supabase, empresaId, key.remoteJid, participant);
+  if (rascunho) {
+    await processarRespostaRascunho(supabase, empresaId, key, participant, rascunho, textoLimpo, ia);
     return;
   }
 
-  // não é comando: só interessa se houver um rascunho pendente desse participant
-  const rascunho = await buscarRascunhoPendente(supabase, empresaId, key.remoteJid, participant);
-  if (!rascunho) return; // conversa comum do grupo -> ignora, sem chamar IA
+  // sem rascunho: só interessa se houver uma pergunta de km inicial pendente
+  const perguntaKm = await buscarPerguntaKmPendente(supabase, empresaId, key.remoteJid, participant);
+  if (!perguntaKm) return; // conversa comum do grupo -> ignora, sem chamar IA
 
-  await processarRespostaRascunho(supabase, empresaId, key, participant, rascunho, textoLimpo, ia);
+  await processarRespostaKmInicial(supabase, key, participant, perguntaKm, textoLimpo);
 }
 
 async function processarComando(
@@ -296,6 +323,208 @@ async function buscarRascunhoPendente(
   return data as RascunhoRow;
 }
 
+/** Busca a pergunta de "km inicial?" pendente mais recente do participant; expira lazily. */
+async function buscarPerguntaKmPendente(
+  supabase: SupabaseClient,
+  empresaId: string,
+  grupoJid: string,
+  participant: string,
+): Promise<PerguntaKmRow | null> {
+  const { data } = await supabase
+    .from("viagem_km_perguntas")
+    .select("id, viagem_id, expira_em")
+    .eq("empresa_id", empresaId)
+    .eq("grupo_jid", grupoJid)
+    .eq("participant", participant)
+    .eq("status", "pendente")
+    .order("criado_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!data) return null;
+
+  if (new Date(data.expira_em).getTime() < Date.now()) {
+    await supabase.from("viagem_km_perguntas").update({ status: "expirada" }).eq("id", data.id);
+    return null;
+  }
+
+  return { id: data.id, viagem_id: data.viagem_id };
+}
+
+/**
+ * Trata a resposta à pergunta "deseja informar o KM inicial dessa viagem?".
+ * Recusa (não/pular/...) só fecha a pergunta. Km reconhecido grava km_inicial
+ * e marca a viagem "em_andamento" (fica aguardando /encerrar). Texto que não
+ * é nem recusa nem número é ignorado (conversa comum do grupo).
+ */
+async function processarRespostaKmInicial(
+  supabase: SupabaseClient,
+  key: EvolutionMessageKey,
+  participant: string,
+  pergunta: PerguntaKmRow,
+  texto: string,
+): Promise<void> {
+  const numero = numeroDoJid(participant);
+
+  if (REGEX_CANCELA.test(texto)) {
+    await supabase.from("viagem_km_perguntas").update({ status: "respondida" }).eq("id", pergunta.id);
+    await enviarMensagemTexto(
+      key.remoteJid,
+      `@${numero}, sem problema. Quando quiser encerrar essa viagem, use /encerrar <km final>.`,
+      participant,
+    );
+    return;
+  }
+
+  const km = parseKmInteiro(texto);
+  if (km === null) return;
+
+  await supabase.from("viagem_km_perguntas").update({ status: "respondida" }).eq("id", pergunta.id);
+  const { error } = await supabase
+    .from("viagens")
+    .update({ km_inicial: km, status: "em_andamento" })
+    .eq("id", pergunta.viagem_id);
+
+  if (error) {
+    console.error("[whatsapp] falha ao gravar km inicial", error.message);
+    await enviarMensagemTexto(key.remoteJid, `@${numero}, não consegui registrar o km, tenta de novo.`, participant);
+    return;
+  }
+
+  await enviarMensagemTexto(
+    key.remoteJid,
+    `@${numero}, KM inicial registrado: ${formatKm(km)}. Quando finalizar, envie /encerrar <km final> pra fechar a viagem.`,
+    participant,
+  );
+}
+
+/**
+ * Trata o comando /encerrar <km final> (ou /encerrar <placa> <km final> se o
+ * motorista tiver mais de uma viagem em andamento). Fecha a viagem
+ * "em_andamento" mais recente do motorista, grava km_final e valida que não
+ * seja menor que o km_inicial.
+ */
+async function processarEncerramento(
+  supabase: SupabaseClient,
+  empresaId: string,
+  key: EvolutionMessageKey,
+  participant: string,
+  resto: string,
+): Promise<void> {
+  const numero = numeroDoJid(participant);
+  const tokens = resto.split(/\s+/).filter(Boolean);
+
+  if (tokens.length === 0 || tokens.length > 2) {
+    await enviarMensagemTexto(
+      key.remoteJid,
+      `@${numero}, formato esperado: /encerrar <km final> (ex: /encerrar 45890). Se tiver mais de uma viagem aberta: /encerrar <placa> <km final>.`,
+      participant,
+    );
+    return;
+  }
+
+  const kmToken = tokens.length === 2 ? tokens[1] : tokens[0];
+  const placaToken = tokens.length === 2 ? tokens[0] : null;
+
+  const kmFinal = parseKmInteiro(kmToken);
+  if (kmFinal === null) {
+    await enviarMensagemTexto(
+      key.remoteJid,
+      `@${numero}, não entendi o km final. Envie só o número, ex: /encerrar 45890.`,
+      participant,
+    );
+    return;
+  }
+
+  const motoristaId = await resolverMotoristaId(supabase, empresaId, participant, null);
+  if (!motoristaId) {
+    await enviarMensagemTexto(
+      key.remoteJid,
+      `@${numero}, não encontrei seu cadastro de motorista pra encerrar a viagem.`,
+      participant,
+    );
+    return;
+  }
+
+  let query = supabase
+    .from("viagens")
+    .select("id, origem, destino, km_inicial, placa_cliente")
+    .eq("empresa_id", empresaId)
+    .eq("motorista_id", motoristaId)
+    .eq("status", "em_andamento")
+    .order("created_at", { ascending: false });
+
+  let placaNormalizada: string | null = null;
+  if (placaToken) {
+    placaNormalizada = validarPlaca(placaToken).normalizada;
+    query = query.eq("placa_cliente", placaNormalizada);
+  }
+
+  const { data: viagensAbertas } = await query;
+
+  if (!viagensAbertas || viagensAbertas.length === 0) {
+    await enviarMensagemTexto(
+      key.remoteJid,
+      placaNormalizada
+        ? `@${numero}, não encontrei viagem em andamento com a placa ${placaNormalizada} pra encerrar.`
+        : `@${numero}, você não tem nenhuma viagem em andamento pra encerrar.`,
+      participant,
+    );
+    return;
+  }
+
+  if (viagensAbertas.length > 1) {
+    const lista = viagensAbertas
+      .map((v) => `${v.placa_cliente ?? "sem placa"} — ${v.origem ?? "?"} até ${v.destino ?? "?"}`)
+      .join("\n");
+    await enviarMensagemTexto(
+      key.remoteJid,
+      `@${numero}, você tem ${viagensAbertas.length} viagens em andamento. Informe a placa: /encerrar <placa> <km final>.\n${lista}`,
+      participant,
+    );
+    return;
+  }
+
+  const viagem = viagensAbertas[0];
+
+  if (viagem.km_inicial === null) {
+    await enviarMensagemTexto(
+      key.remoteJid,
+      `@${numero}, essa viagem não tem km inicial registrado, não dá pra calcular o km rodado.`,
+      participant,
+    );
+    return;
+  }
+
+  if (kmFinal < viagem.km_inicial) {
+    await enviarMensagemTexto(
+      key.remoteJid,
+      `@${numero}, km final (${formatKm(kmFinal)}) não pode ser menor que o km inicial (${formatKm(viagem.km_inicial)}). Confira o valor e tenta de novo.`,
+      participant,
+    );
+    return;
+  }
+
+  const { error } = await supabase
+    .from("viagens")
+    .update({ km_final: kmFinal, status: "concluida" })
+    .eq("id", viagem.id);
+
+  if (error) {
+    console.error("[whatsapp] falha ao encerrar viagem", error.message);
+    await enviarMensagemTexto(key.remoteJid, `@${numero}, não consegui encerrar a viagem, tenta de novo.`, participant);
+    return;
+  }
+
+  const kmRodado = kmFinal - viagem.km_inicial;
+  const trajeto = viagem.origem && viagem.destino ? ` (${viagem.origem} até ${viagem.destino})` : "";
+  await enviarMensagemTexto(
+    key.remoteJid,
+    `@${numero}, viagem encerrada${trajeto}! KM rodado: ${formatKm(kmRodado)}. ✅`,
+    participant,
+  );
+}
+
 /** Trata a resposta do participant a um rascunho pendente: confirmar, cancelar ou corrigir. */
 async function processarRespostaRascunho(
   supabase: SupabaseClient,
@@ -324,12 +553,33 @@ async function processarRespostaRascunho(
       return;
     }
 
-    const { totalLancamentos, totalViagens } = await salvarLancamento(supabase, empresaId, rascunho);
+    const { totalLancamentos, viagensCriadas } = await salvarLancamento(supabase, empresaId, rascunho);
     const msgLancamentos =
       totalLancamentos === 1 ? "Lançamento salvo" : `${totalLancamentos} lançamentos salvos`;
     const msgViagens =
-      totalViagens === 0 ? "" : totalViagens === 1 ? " e viagem registrada" : ` e ${totalViagens} viagens registradas`;
-    await enviarMensagemTexto(key.remoteJid, `@${numero}, pronto! ${msgLancamentos}${msgViagens}. ✅`, participant);
+      viagensCriadas.length === 0
+        ? ""
+        : viagensCriadas.length === 1
+          ? " e viagem registrada"
+          : ` e ${viagensCriadas.length} viagens registradas`;
+
+    // só oferece o fluxo de km quando dá pra depois localizar a viagem pelo /encerrar (precisa de motorista_id)
+    let perguntaKm = "";
+    if (viagensCriadas.length === 1 && rascunho.motorista_id) {
+      await supabase.from("viagem_km_perguntas").insert({
+        empresa_id: empresaId,
+        viagem_id: viagensCriadas[0].id,
+        grupo_jid: key.remoteJid,
+        participant,
+      });
+      perguntaKm = "\nDeseja informar o KM inicial dessa viagem? Responda com o número (ex: 45890).";
+    }
+
+    await enviarMensagemTexto(
+      key.remoteJid,
+      `@${numero}, pronto! ${msgLancamentos}${msgViagens}. ✅${perguntaKm}`,
+      participant,
+    );
     return;
   }
 
@@ -382,16 +632,16 @@ async function salvarLancamento(
   supabase: SupabaseClient,
   empresaId: string,
   rascunho: RascunhoRow,
-): Promise<{ totalLancamentos: number; totalViagens: number }> {
+): Promise<{ totalLancamentos: number; viagensCriadas: { id: string; origem: string | null; destino: string | null }[] }> {
   const { payload } = rascunho;
 
-  let totalViagens = 0;
+  const viagensCriadas: { id: string; origem: string | null; destino: string | null }[] = [];
   const rows = [];
   for (const item of payload.itens) {
     let viagemId: string | null = null;
     if (item.origem && item.destino) {
       viagemId = await criarViagemDoItem(supabase, empresaId, item, rascunho.motorista_id);
-      if (viagemId) totalViagens += 1;
+      if (viagemId) viagensCriadas.push({ id: viagemId, origem: item.origem, destino: item.destino });
     }
 
     rows.push({
@@ -411,7 +661,7 @@ async function salvarLancamento(
   await supabase.from("lancamentos_financeiros").insert(rows);
   await supabase.from("lancamentos_pendentes").update({ status: "confirmado" }).eq("id", rascunho.id);
 
-  return { totalLancamentos: rows.length, totalViagens };
+  return { totalLancamentos: rows.length, viagensCriadas };
 }
 
 /**
@@ -475,6 +725,7 @@ async function criarViagemDoItem(
       data: item.data,
       observacoes: item.descricao,
       segurado: item.segurado ?? null,
+      seguradora: item.seguradora ?? null,
       placa_cliente: item.placaCliente ?? null,
     })
     .select("id")

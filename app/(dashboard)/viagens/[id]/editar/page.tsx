@@ -18,7 +18,7 @@ export default async function EditarViagemPage({
       supabase
         .from("viagens")
         .select(
-          "id, cliente_id, motorista_id, veiculo_id, origem, destino, origem_cidade, origem_uf, origem_ibge, origem_lat, origem_lon, destino_cidade, destino_uf, destino_ibge, destino_lat, destino_lon, valor, status, data, observacoes, segurado, placa_cliente, clientes(nome), motoristas(nome), veiculos_frota(placa, modelo)",
+          "id, cliente_id, motorista_id, veiculo_id, origem, destino, origem_cidade, origem_uf, origem_ibge, origem_lat, origem_lon, destino_cidade, destino_uf, destino_ibge, destino_lat, destino_lon, valor, status, data, observacoes, segurado, seguradora, placa_cliente, clientes(nome), motoristas(nome), veiculos_frota(placa, modelo)",
         )
         .eq("id", id)
         .maybeSingle<Viagem>(),

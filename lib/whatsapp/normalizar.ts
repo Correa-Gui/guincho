@@ -60,6 +60,7 @@ function normalizarItem(
     origem: item.origem,
     destino: item.destino,
     segurado: item.segurado,
+    seguradora: item.seguradora,
     placaCliente: item.placaCliente ? validarPlaca(item.placaCliente).normalizada : null,
   };
 }

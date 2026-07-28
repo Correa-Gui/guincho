@@ -57,6 +57,73 @@ async function rotaEntreMunicipios(
   return getRota(origem.ponto, destino.ponto);
 }
 
+type ConfigBaseEmpresa = {
+  tarifaKm: number;
+  precoCombustivel: number;
+  base: PontoRota | null;
+};
+
+/** Tarifa/combustível/base da empresa do usuário logado (fallback: tarifa 5, combustível 6, sem base). */
+async function obterConfigBaseEmpresa(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<ConfigBaseEmpresa> {
+  const config: ConfigBaseEmpresa = { tarifaKm: 5, precoCombustivel: 6, base: null };
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return config;
+
+  const { data: usuario } = await supabase
+    .from("usuarios")
+    .select("empresa_id")
+    .eq("id", user.id)
+    .single();
+  if (!usuario) return config;
+
+  const { data: empresa } = await supabase
+    .from("empresas")
+    .select("tarifa_km_padrao, preco_combustivel_padrao, base_ibge, base_lat, base_lon")
+    .eq("id", usuario.empresa_id)
+    .single();
+  if (!empresa) return config;
+
+  config.tarifaKm = empresa.tarifa_km_padrao;
+  config.precoCombustivel = empresa.preco_combustivel_padrao;
+  if (empresa.base_ibge && empresa.base_lat != null && empresa.base_lon != null) {
+    config.base = { ibge: empresa.base_ibge, lat: empresa.base_lat, lon: empresa.base_lon };
+  }
+  return config;
+}
+
+type RetornoBase = {
+  retornoKm: number;
+  retornoDuracaoMin: number;
+  pedagioRetornoEstimado: number | null;
+  valorRetorno: number;
+};
+
+/** Trecho destino → base (retorno do guincho), com valor = km*tarifa + pedágio estimado. */
+async function calcularRetornoBase(
+  destino: PontoRota | null,
+  base: PontoRota | null,
+  tarifaKm: number,
+): Promise<RetornoBase | null> {
+  if (!destino || !base) return null;
+  const retorno = await getRota(destino, base);
+  if (!retorno) return null;
+
+  const valorRetorno =
+    Math.round((retorno.distanciaKm * tarifaKm + (retorno.pedagioEstimado ?? 0)) * 100) / 100;
+
+  return {
+    retornoKm: retorno.distanciaKm,
+    retornoDuracaoMin: retorno.duracaoMin,
+    pedagioRetornoEstimado: retorno.pedagioEstimado,
+    valorRetorno,
+  };
+}
+
 async function buildPayload(formData: FormData) {
   const valor = parseValor(String(formData.get("valor") ?? "0"));
   if (valor === null) return null;
@@ -68,20 +135,39 @@ async function buildPayload(formData: FormData) {
 
   const rota = await rotaEntreMunicipios(origemMunicipio, destinoMunicipio);
 
+  const veiculoId = (formData.get("veiculo_id") as string) || null;
+  const supabase = await createClient();
+  const config = await obterConfigBaseEmpresa(supabase);
+  let tarifaKm = config.tarifaKm;
+  if (veiculoId) {
+    const { data: veiculo } = await supabase
+      .from("veiculos_frota")
+      .select("tarifa_km")
+      .eq("id", veiculoId)
+      .single();
+    if (veiculo?.tarifa_km) tarifaKm = veiculo.tarifa_km;
+  }
+  const retorno = await calcularRetornoBase(destinoMunicipio.ponto, config.base, tarifaKm);
+
   return {
     motorista_id: (formData.get("motorista_id") as string) || null,
-    veiculo_id: (formData.get("veiculo_id") as string) || null,
+    veiculo_id: veiculoId,
     origem: (formData.get("origem") as string) || null,
     destino: (formData.get("destino") as string) || null,
     ...origemMunicipio.campos,
     ...destinoMunicipio.campos,
     distancia_km: rota?.distanciaKm ?? null,
     pedagio_estimado: rota?.pedagioEstimado ?? null,
+    retorno_km: retorno?.retornoKm ?? null,
+    retorno_duracao_min: retorno?.retornoDuracaoMin ?? null,
+    pedagio_retorno_estimado: retorno?.pedagioRetornoEstimado ?? null,
+    valor_retorno: retorno?.valorRetorno ?? null,
     valor,
     status: (formData.get("status") as string) || "agendada",
     data: (formData.get("data") as string) || new Date().toISOString().slice(0, 10),
     observacoes: (formData.get("observacoes") as string) || null,
     segurado: (formData.get("segurado") as string) || null,
+    seguradora: (formData.get("seguradora") as string) || null,
     placa_cliente: placaClienteNormalizada(formData.get("placa_cliente") as string | null),
   };
 }
@@ -102,6 +188,7 @@ export type SugestaoRota = {
   retornoKm: number | null;
   retornoDuracaoMin: number | null;
   pedagioRetornoEstimado: number | null;
+  valorRetorno: number | null;
   distanciaTotalKm: number;
   custoCombustivelEstimado: number | null;
   precoSugerido: number;
@@ -116,85 +203,61 @@ export async function sugerirRota(
   if (!rota) return null;
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const config = await obterConfigBaseEmpresa(supabase);
+  const precoCombustivel = config.precoCombustivel;
+  let tarifaKm = config.tarifaKm;
 
-  let tarifaKm = 5;
-  let precoCombustivel = 6;
-  let saidaBaseKm: number | null = null;
-  let saidaBaseDuracaoMin: number | null = null;
-  let pedagioSaidaEstimado: number | null = null;
-  let retornoKm: number | null = null;
-  let retornoDuracaoMin: number | null = null;
-  let pedagioRetornoEstimado: number | null = null;
-
-  if (user) {
-    const { data: usuario } = await supabase
-      .from("usuarios")
-      .select("empresa_id")
-      .eq("id", user.id)
-      .single();
-    if (usuario) {
-      const { data: empresa } = await supabase
-        .from("empresas")
-        .select("tarifa_km_padrao, preco_combustivel_padrao, base_ibge, base_lat, base_lon")
-        .eq("id", usuario.empresa_id)
-        .single();
-      if (empresa) {
-        tarifaKm = empresa.tarifa_km_padrao;
-        precoCombustivel = empresa.preco_combustivel_padrao;
-
-        if (empresa.base_ibge && empresa.base_lat != null && empresa.base_lon != null) {
-          const base: PontoRota = {
-            ibge: empresa.base_ibge,
-            lat: empresa.base_lat,
-            lon: empresa.base_lon,
-          };
-
-          const [saida, retorno] = await Promise.all([
-            getRota(base, origem),
-            getRota(destino, base),
-          ]);
-
-          if (saida) {
-            saidaBaseKm = saida.distanciaKm;
-            saidaBaseDuracaoMin = saida.duracaoMin;
-            pedagioSaidaEstimado = saida.pedagioEstimado;
-          }
-          if (retorno) {
-            retornoKm = retorno.distanciaKm;
-            retornoDuracaoMin = retorno.duracaoMin;
-            pedagioRetornoEstimado = retorno.pedagioEstimado;
-          }
-        }
-      }
-    }
-  }
-
-  const distanciaTotalKm =
-    Math.round((rota.distanciaKm + (saidaBaseKm ?? 0) + (retornoKm ?? 0)) * 10) / 10;
-
-  let custoCombustivelEstimado: number | null = null;
+  let consumoKml: number | null = null;
   if (veiculoId) {
     const { data: veiculo } = await supabase
       .from("veiculos_frota")
       .select("consumo_kml, tarifa_km")
       .eq("id", veiculoId)
       .single();
-    if (veiculo?.consumo_kml) {
-      custoCombustivelEstimado =
-        Math.round((distanciaTotalKm / veiculo.consumo_kml) * precoCombustivel * 100) / 100;
+    consumoKml = veiculo?.consumo_kml ?? null;
+    if (veiculo?.tarifa_km) tarifaKm = veiculo.tarifa_km;
+  }
+
+  let saidaBaseKm: number | null = null;
+  let saidaBaseDuracaoMin: number | null = null;
+  let pedagioSaidaEstimado: number | null = null;
+  let retornoKm: number | null = null;
+  let retornoDuracaoMin: number | null = null;
+  let pedagioRetornoEstimado: number | null = null;
+  let valorRetorno: number | null = null;
+
+  if (config.base) {
+    const [saida, retorno] = await Promise.all([
+      getRota(config.base, origem),
+      calcularRetornoBase(destino, config.base, tarifaKm),
+    ]);
+    if (saida) {
+      saidaBaseKm = saida.distanciaKm;
+      saidaBaseDuracaoMin = saida.duracaoMin;
+      pedagioSaidaEstimado = saida.pedagioEstimado;
     }
-    if (veiculo?.tarifa_km) {
-      tarifaKm = veiculo.tarifa_km;
+    if (retorno) {
+      retornoKm = retorno.retornoKm;
+      retornoDuracaoMin = retorno.retornoDuracaoMin;
+      pedagioRetornoEstimado = retorno.pedagioRetornoEstimado;
+      valorRetorno = retorno.valorRetorno;
     }
   }
+
+  const distanciaTotalKm =
+    Math.round((rota.distanciaKm + (saidaBaseKm ?? 0) + (retornoKm ?? 0)) * 10) / 10;
+
+  const custoCombustivelEstimado =
+    consumoKml != null
+      ? Math.round((distanciaTotalKm / consumoKml) * precoCombustivel * 100) / 100
+      : null;
 
   const precoSugerido =
     Math.round(
       (rota.distanciaKm * tarifaKm +
         (rota.pedagioEstimado ?? 0) +
         (pedagioSaidaEstimado ?? 0) +
-        (pedagioRetornoEstimado ?? 0) +
+        (valorRetorno ?? 0) +
         (custoCombustivelEstimado ?? 0)) *
         100,
     ) / 100;
@@ -209,6 +272,7 @@ export async function sugerirRota(
     retornoKm,
     retornoDuracaoMin,
     pedagioRetornoEstimado,
+    valorRetorno,
     distanciaTotalKm,
     custoCombustivelEstimado,
     precoSugerido,

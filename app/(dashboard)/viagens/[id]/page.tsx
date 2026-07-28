@@ -28,7 +28,7 @@ export default async function ViagemDetailPage({
   const { data: viagem } = await supabase
     .from("viagens")
     .select(
-      "id, origem, destino, origem_cidade, origem_uf, destino_cidade, destino_uf, distancia_km, pedagio_estimado, valor, status, data, observacoes, segurado, placa_cliente, clientes(nome), motoristas(nome), veiculos_frota(placa, modelo)",
+      "id, origem, destino, origem_cidade, origem_uf, destino_cidade, destino_uf, distancia_km, pedagio_estimado, valor, status, data, observacoes, segurado, seguradora, placa_cliente, clientes(nome), motoristas(nome), veiculos_frota(placa, modelo)",
     )
     .eq("id", id)
     .maybeSingle<Viagem>();
@@ -44,6 +44,7 @@ export default async function ViagemDetailPage({
         ? `${viagem.veiculos_frota.placa}${viagem.veiculos_frota.modelo ? ` — ${viagem.veiculos_frota.modelo}` : ""}`
         : "—",
     },
+    { label: "Seguradora", value: viagem.seguradora ?? "—" },
     { label: "Segurado", value: viagem.segurado ?? "—" },
     { label: "Placa do cliente", value: viagem.placa_cliente ?? "—" },
     {

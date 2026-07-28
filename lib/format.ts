@@ -13,6 +13,10 @@ export function formatDate(value: string | Date): string {
   return new Intl.DateTimeFormat("pt-BR").format(date);
 }
 
+export function formatKm(value: number): string {
+  return `${new Intl.NumberFormat("pt-BR").format(value)} km`;
+}
+
 export function formatDateTime(value: string | Date): string {
   const date = typeof value === "string" ? new Date(value) : value;
   return new Intl.DateTimeFormat("pt-BR", {
