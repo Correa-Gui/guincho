@@ -79,7 +79,7 @@ export default async function ViagensPage() {
           {/* Mobile: cards */}
           <div className="flex flex-col gap-3 sm:hidden">
             {lista.map((viagem) => (
-              <Link key={viagem.id} href={`/viagens/${viagem.id}/editar`}>
+              <Link key={viagem.id} href={`/viagens/${viagem.id}`}>
                 <Card className="transition-colors hover:bg-accent/50">
                   <CardContent className="flex flex-col gap-2">
                     <div className="flex items-center justify-between gap-2">
@@ -129,37 +129,37 @@ export default async function ViagensPage() {
                   {lista.map((viagem) => (
                     <TableRow key={viagem.id} className="cursor-pointer">
                       <TableCell>
-                        <Link href={`/viagens/${viagem.id}/editar`} className="block">
+                        <Link href={`/viagens/${viagem.id}`} className="block">
                           {formatDate(viagem.data)}
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <Link href={`/viagens/${viagem.id}/editar`} className="block">
+                        <Link href={`/viagens/${viagem.id}`} className="block">
                           {viagem.clientes?.nome ?? "—"}
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <Link href={`/viagens/${viagem.id}/editar`} className="block max-w-xs truncate">
+                        <Link href={`/viagens/${viagem.id}`} className="block max-w-xs truncate">
                           {viagem.origem ?? "—"} → {viagem.destino ?? "—"}
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <Link href={`/viagens/${viagem.id}/editar`} className="block max-w-[10rem] truncate">
+                        <Link href={`/viagens/${viagem.id}`} className="block max-w-[10rem] truncate">
                           {[viagem.seguradora, viagem.segurado, viagem.placa_cliente].filter(Boolean).join(" · ") || "—"}
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <Link href={`/viagens/${viagem.id}/editar`} className="block">
+                        <Link href={`/viagens/${viagem.id}`} className="block">
                           {viagem.motoristas?.nome ?? "—"}
                         </Link>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Link href={`/viagens/${viagem.id}/editar`} className="block font-mono tabular-nums">
+                        <Link href={`/viagens/${viagem.id}`} className="block font-mono tabular-nums">
                           {formatCurrency(viagem.valor)}
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <Link href={`/viagens/${viagem.id}/editar`} className="block">
+                        <Link href={`/viagens/${viagem.id}`} className="block">
                           <Badge className={VIAGEM_STATUS_BADGE_CLASS[viagem.status]}>
                             {VIAGEM_STATUS_LABEL[viagem.status]}
                           </Badge>

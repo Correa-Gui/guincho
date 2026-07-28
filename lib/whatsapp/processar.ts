@@ -84,10 +84,24 @@ async function resolverMotoristaId(
     .from("motoristas")
     .select("id")
     .eq("empresa_id", empresaId)
-    .eq("telefone_normalizado", numero)
+    .in("telefone_normalizado", telefonesCandidatos(numero))
     .maybeSingle();
 
   return porTelefone?.id ?? null;
+}
+
+/**
+ * O JID do WhatsApp sempre traz o DDI 55 (ex: "5516996465735"), mas
+ * `telefone_normalizado` é gerado a partir do que foi digitado manualmente no
+ * cadastro do motorista, que normalmente NÃO inclui o DDI (ex: "16996465735").
+ * Testa os dois formatos pra não depender de como o número foi cadastrado.
+ */
+function telefonesCandidatos(numero: string): string[] {
+  const candidatos = [numero];
+  if (numero.startsWith("55") && (numero.length === 12 || numero.length === 13)) {
+    candidatos.push(numero.slice(2));
+  }
+  return candidatos;
 }
 
 /** Ponto de entrada: processa um evento de webhook da Evolution API. */
