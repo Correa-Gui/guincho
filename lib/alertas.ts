@@ -49,6 +49,41 @@ type AlertaCandidato = {
   referencia_id: string;
 };
 
+const TABELA_POR_REFERENCIA: Record<string, string> = {
+  conta_a_receber: "contas_a_receber",
+  patio: "patio",
+  viagem: "viagens",
+  documento_frota: "documentos_frota",
+  manutencao_frota: "manutencoes_frota",
+};
+
+/**
+ * `alertas.referencia_id` não tem FK (é polimórfico, aponta pra tabelas
+ * diferentes conforme `referencia_tipo`) — se o registro de origem for
+ * excluído, o alerta fica órfão pra sempre. Remove antes de gerar novos.
+ */
+async function removerAlertasOrfaos(supabase: SupabaseClient, empresaId: string): Promise<void> {
+  for (const [referenciaTipo, tabela] of Object.entries(TABELA_POR_REFERENCIA)) {
+    const { data: alertasExistentes } = await supabase
+      .from("alertas")
+      .select("id, referencia_id")
+      .eq("empresa_id", empresaId)
+      .eq("referencia_tipo", referenciaTipo);
+    if (!alertasExistentes || alertasExistentes.length === 0) continue;
+
+    const { data: registrosValidos } = await supabase
+      .from(tabela)
+      .select("id")
+      .in("id", alertasExistentes.map((a) => a.referencia_id));
+    const idsValidos = new Set((registrosValidos ?? []).map((r) => r.id));
+
+    const idsOrfaos = alertasExistentes.filter((a) => !idsValidos.has(a.referencia_id)).map((a) => a.id);
+    if (idsOrfaos.length > 0) {
+      await supabase.from("alertas").delete().in("id", idsOrfaos);
+    }
+  }
+}
+
 function toISODate(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
@@ -70,6 +105,8 @@ export async function gerarAlertasAutomaticos(supabase: SupabaseClient): Promise
 
   const empresaId = usuario?.empresa_id;
   if (!empresaId) return;
+
+  await removerAlertasOrfaos(supabase, empresaId);
 
   const hoje = new Date();
   const hojeStr = toISODate(hoje);
