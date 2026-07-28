@@ -1,5 +1,6 @@
 import { LANCAMENTO_CATEGORIAS } from "@/lib/types";
 import {
+  CIDADES_REGIAO_HINT,
   DEFAULT_PROMPT_INTERPRETAR_MENSAGEM,
   DEFAULT_PROMPT_LER_COMPROVANTE,
   INTENCOES,
@@ -57,6 +58,9 @@ export class OpenAIProvider implements AIProvider {
     form.append("file", new Blob([new Uint8Array(arquivo)], { type: mimeType }), `audio.${ext}`);
     form.append("model", "whisper-1");
     form.append("language", "pt");
+    // Whisper usa o "prompt" como dica de vocabulário/estilo, não como instrução
+    // — nomes de cidade da região reduzem erro em nomes próprios incomuns.
+    form.append("prompt", `Nomes de cidade que podem aparecer: ${CIDADES_REGIAO_HINT}.`);
 
     let res: Response;
     try {

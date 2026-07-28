@@ -24,8 +24,15 @@ export const INTENCOES: IntencaoMensagem[] = [
  * placeholders. O texto da mensagem do usuário é sempre anexado ao final do
  * prompt de `interpretarMensagem`, não faz parte do template.
  */
+// Nomes de cidade da região de operação, usados como dica de vocabulário na
+// transcrição — modelos de fala tendem a "corrigir" nomes próprios pouco
+// comuns pra palavras parecidas (ex: "Jaboticabal" virando "Chabu de Cabal").
+export const CIDADES_REGIAO_HINT =
+  "Jaboticabal, Guariba, Taquaritinga, Monte Alto, Taiúçu, Ribeirão Preto, Franca, Uberaba, Campinas";
+
 export const DEFAULT_PROMPT_TRANSCREVER_AUDIO =
   "Transcreva o áudio abaixo (em português do Brasil) literalmente, sem resumir. " +
+  `Nomes de cidade que podem aparecer: ${CIDADES_REGIAO_HINT}. ` +
   'Responda apenas em JSON, no formato {"transcricao": "texto transcrito"}.';
 
 export const DEFAULT_PROMPT_LER_COMPROVANTE = `Analise a foto de comprovante/nota fiscal/recibo abaixo e extraia os dados do gasto.
@@ -51,7 +58,7 @@ Regras gerais:
   - "correcao": a mensagem corrige valor/categoria/data/descrição de um lançamento pendente (ex: "o almoço foi 50"). "itens" traz o(s) lançamento(s) com os campos corrigidos (campos não mencionados ficam null).
   - "desconhecido": não se encaixa em nenhuma das opções acima. "itens": [].
 - "data": se a mensagem mencionar uma data explícita válida p/ TODOS os lançamentos (ex: "ontem"), no formato YYYY-MM-DD. Senão null (assume-se hoje).
-- "motorista": se a mensagem citar explicitamente o nome de um motorista (ex: "motorista: Fulano", "o Cicero fez esse frete", "em nome do João"), extraia só o nome próprio. Se a mensagem não mencionar nenhum motorista por nome, use null (o motorista será identificado pelo número de quem enviou).
+- "motorista": se a mensagem citar explicitamente o nome de quem DIRIGIU/EXECUTOU o serviço (ex: "motorista: Fulano", "o Cicero fez esse frete", "em nome do João"), extraia só o nome próprio. Se a mensagem não mencionar nenhum motorista por nome, use null (o motorista será identificado pelo número de quem enviou). CUIDADO: um nome logo depois de "cliente"/"segurado"/"segurada" NUNCA é o motorista, mesmo que apareça no início da frase — vai em "segurado" (ver abaixo), não aqui.
 
 REGRA-CHAVE — UMA MENSAGEM PODE CONTER VÁRIOS LANÇAMENTOS:
 - Cada ganho/gasto citado na mensagem é um ITEM SEPARADO em "itens", com seu próprio tipo/valor/categoria/descrição.
@@ -60,11 +67,11 @@ REGRA-CHAVE — UMA MENSAGEM PODE CONTER VÁRIOS LANÇAMENTOS:
 Para cada item em "itens":
 - "tipo": "receita" ou "despesa".
 - "valor": valor em reais como número (ex: 50, 1234.56). Se esse item não tiver valor identificável, null.
-- "categoria": se "tipo" for "despesa", escolha entre: {{CATEGORIAS_DESPESA}}. Se "receita", escolha entre: {{CATEGORIAS_RECEITA}}.
+- "categoria": se "tipo" for "despesa", escolha entre: {{CATEGORIAS_DESPESA}}. Se "receita", escolha entre: {{CATEGORIAS_RECEITA}} — remoção/reboque/socorro/resgate/pane/sinistro (serviço de guincho em si) é sempre "Guincho", mesmo sem a palavra "guincho" na mensagem; "Frete" é só transporte de carga sem pane/acidente; use "Outros" apenas se nenhum dos dois se aplicar.
 - "data": data desse lançamento específico (YYYY-MM-DD), se diferente da data padrão da mensagem. Senão null.
 - "descricao": breve descrição do lançamento (ex: "almoço", "Viagem Jaboticabal -> Taiúçu"). Senão null.
 - "origem" e "destino": se o item descrever um trajeto/serviço entre dois lugares (ex: "socorro de X até Y", "frete de X pra Y", "viagem de X a Y"), preencha com os nomes dos lugares mencionados (cidades), sem prefixos como "de"/"até". Se a mensagem não mencionar um trajeto, ambos null.
-- "segurado": se a mensagem citar explicitamente o nome do segurado/cliente dono do veículo guinchado (ex: "segurado: Maria Silva", "segurada Maria", "cliente: João"), extraia só o nome. Senão null.
+- "segurado": se a mensagem citar explicitamente o nome do segurado/cliente dono do veículo guinchado (ex: "segurado: Maria Silva", "segurada Maria", "cliente: João", "remoção cliente João Abel" — com ou sem dois-pontos, "cliente"/"segurado" sempre antes do nome), extraia só o nome. Senão null.
 - "seguradora": se a mensagem citar explicitamente o nome da seguradora responsável pelo sinistro (ex: "seguradora: Porto Seguro", "seguradora Azul Seguros"), extraia só o nome — é diferente do segurado (a seguradora é a empresa, o segurado é a pessoa dona do veículo). Senão null.
 - "placa": se a mensagem citar a placa do veículo do cliente guinchado (ex: "placa ABC1D23", "placa: ABC-1234"), extraia exatamente como veio na mensagem (não normalize). Senão null.
 
@@ -93,6 +100,9 @@ Resposta: {"intencao": "receita", "data": null, "motorista": null, "itens": [{"t
 
 Mensagem: "Socorro de Jaboticabal até Taiúçu, recebi 350. Seguradora: Porto Seguro, segurado: João, placa ABC1D23"
 Resposta: {"intencao": "receita", "data": null, "motorista": null, "itens": [{"tipo": "receita", "valor": 350, "categoria": "Guincho", "data": null, "descricao": "Socorro Jaboticabal -> Taiúçu", "origem": "Jaboticabal", "destino": "Taiúçu", "segurado": "João", "seguradora": "Porto Seguro", "placa": "ABC1D23"}]}
+
+Mensagem: "Remoção cliente João Abel, coleta, posto Bola 7, destino Jaboticabal, valor 250 reais"
+Resposta: {"intencao": "receita", "data": null, "motorista": null, "itens": [{"tipo": "receita", "valor": 250, "categoria": "Guincho", "data": null, "descricao": "Remoção e coleta", "origem": "Posto Bola 7", "destino": "Jaboticabal", "segurado": "João Abel", "seguradora": null, "placa": null}]}
 
 Mensagem: "sim"
 Resposta: {"intencao": "confirmacao", "data": null, "motorista": null, "itens": []}

@@ -59,13 +59,19 @@ type PerguntaKmRow = {
 /**
  * Resolve o motorista do lançamento: prioriza o nome citado explicitamente na
  * mensagem (ex: "motorista: Fulano"), com fallback pro telefone de quem
- * enviou a mensagem no grupo (casado contra `motoristas.telefone_normalizado`).
+ * enviou a mensagem no grupo (casado contra `motoristas.telefone_normalizado`)
+ * e, por último, pro `pushName` (nome de exibição do WhatsApp de quem
+ * enviou). O fallback por telefone só funciona quando o JID do participant é
+ * baseado em número (`@s.whatsapp.net`) — grupos com "Linked ID" ativado
+ * mandam `participant` como `@lid` (id opaco, sem telefone nenhum), caso em
+ * que o pushName é o único jeito de identificar quem mandou.
  */
 async function resolverMotoristaId(
   supabase: SupabaseClient,
   empresaId: string,
   participant: string,
   motoristaNome: string | null,
+  pushName: string | null,
 ): Promise<string | null> {
   if (motoristaNome) {
     const { data } = await supabase
@@ -86,8 +92,21 @@ async function resolverMotoristaId(
     .eq("empresa_id", empresaId)
     .in("telefone_normalizado", telefonesCandidatos(numero))
     .maybeSingle();
+  if (porTelefone) return porTelefone.id;
 
-  return porTelefone?.id ?? null;
+  if (pushName) {
+    const { data: porPushName } = await supabase
+      .from("motoristas")
+      .select("id")
+      .eq("empresa_id", empresaId)
+      .eq("ativo", true)
+      .ilike("nome", `%${pushName}%`)
+      .limit(1)
+      .maybeSingle();
+    if (porPushName) return porPushName.id;
+  }
+
+  return null;
 }
 
 /**
@@ -108,7 +127,7 @@ function telefonesCandidatos(numero: string): string[] {
 export async function processarWebhookEvolution(body: EvolutionWebhookBody): Promise<void> {
   if (body.event !== "messages.upsert" || !body.data?.key) return;
 
-  const { key, message, messageType } = body.data;
+  const { key, message, messageType, pushName } = body.data;
 
   if (key.fromMe) return;
   if (!key.remoteJid.endsWith("@g.us")) return;
@@ -136,11 +155,11 @@ export async function processarWebhookEvolution(body: EvolutionWebhookBody): Pro
     message?.conversation ?? message?.extendedTextMessage?.text ?? message?.imageMessage?.caption ?? "";
 
   if (messageType === "audioMessage") {
-    await processarAudio(supabase, grupo.empresa_id, key, participant, ia);
+    await processarAudio(supabase, grupo.empresa_id, key, participant, ia, pushName ?? null);
   } else if (messageType === "imageMessage") {
-    await processarFoto(supabase, grupo.empresa_id, key, participant, ia);
+    await processarFoto(supabase, grupo.empresa_id, key, participant, ia, pushName ?? null);
   } else if (messageType === "conversation" || messageType === "extendedTextMessage") {
-    await processarTexto(supabase, grupo.empresa_id, key, participant, texto, ia);
+    await processarTexto(supabase, grupo.empresa_id, key, participant, texto, ia, pushName ?? null);
   }
 }
 
@@ -162,6 +181,7 @@ async function processarAudio(
   key: EvolutionMessageKey,
   participant: string,
   ia: IAContext,
+  pushName: string | null,
 ): Promise<void> {
   const midia = await baixarMidiaMensagem(key);
   if (!midia) {
@@ -173,6 +193,7 @@ async function processarAudio(
       "whatsapp_audio",
       null,
       "não consegui baixar o áudio",
+      pushName,
     );
     return;
   }
@@ -192,11 +213,12 @@ async function processarAudio(
       "whatsapp_audio",
       midia,
       mensagemErroIA(err),
+      pushName,
     );
     return;
   }
 
-  await criarRascunho(supabase, empresaId, key, participant, "whatsapp_audio", payload, midia);
+  await criarRascunho(supabase, empresaId, key, participant, "whatsapp_audio", payload, midia, pushName);
 }
 
 async function processarFoto(
@@ -205,6 +227,7 @@ async function processarFoto(
   key: EvolutionMessageKey,
   participant: string,
   ia: IAContext,
+  pushName: string | null,
 ): Promise<void> {
   const midia = await baixarMidiaMensagem(key);
   if (!midia) {
@@ -216,6 +239,7 @@ async function processarFoto(
       "whatsapp_foto",
       null,
       "não consegui baixar a foto",
+      pushName,
     );
     return;
   }
@@ -234,11 +258,12 @@ async function processarFoto(
       "whatsapp_foto",
       midia,
       mensagemErroIA(err),
+      pushName,
     );
     return;
   }
 
-  await criarRascunho(supabase, empresaId, key, participant, "whatsapp_foto", payload, midia);
+  await criarRascunho(supabase, empresaId, key, participant, "whatsapp_foto", payload, midia, pushName);
 }
 
 async function processarTexto(
@@ -248,6 +273,7 @@ async function processarTexto(
   participant: string,
   texto: string,
   ia: IAContext,
+  pushName: string | null,
 ): Promise<void> {
   const textoLimpo = texto.trim();
   if (!textoLimpo) return;
@@ -257,18 +283,18 @@ async function processarTexto(
     const comando = match[1].toLowerCase();
     // /encerrar não gera lançamento (não tem tipo em COMANDOS), por isso fica fora do mapa.
     if (comando === "/encerrar") {
-      await processarEncerramento(supabase, empresaId, key, participant, match[2].trim());
+      await processarEncerramento(supabase, empresaId, key, participant, match[2].trim(), pushName);
       return;
     }
     if (COMANDOS[comando]) {
-      await processarComando(supabase, empresaId, key, participant, COMANDOS[comando], match[2].trim(), ia);
+      await processarComando(supabase, empresaId, key, participant, COMANDOS[comando], match[2].trim(), ia, pushName);
       return;
     }
   }
 
   const rascunho = await buscarRascunhoPendente(supabase, empresaId, key.remoteJid, participant);
   if (rascunho) {
-    await processarRespostaRascunho(supabase, empresaId, key, participant, rascunho, textoLimpo, ia);
+    await processarRespostaRascunho(supabase, empresaId, key, participant, rascunho, textoLimpo, ia, pushName);
     return;
   }
 
@@ -287,6 +313,7 @@ async function processarComando(
   tipoForcado: LancamentoTipo,
   resto: string,
   ia: IAContext,
+  pushName: string | null,
 ): Promise<void> {
   const provider = getAIProvider(ia.config?.provider);
   let payload: RascunhoPayload | null;
@@ -302,11 +329,12 @@ async function processarComando(
       "whatsapp_texto",
       null,
       mensagemErroIA(err),
+      pushName,
     );
     return;
   }
 
-  await criarRascunho(supabase, empresaId, key, participant, "whatsapp_texto", payload, null);
+  await criarRascunho(supabase, empresaId, key, participant, "whatsapp_texto", payload, null, pushName);
 }
 
 /** Busca o rascunho pendente mais recente do participant; expira lazily se passou de expira_em. */
@@ -424,6 +452,7 @@ async function processarEncerramento(
   key: EvolutionMessageKey,
   participant: string,
   resto: string,
+  pushName: string | null,
 ): Promise<void> {
   const numero = numeroDoJid(participant);
   const tokens = resto.split(/\s+/).filter(Boolean);
@@ -450,7 +479,7 @@ async function processarEncerramento(
     return;
   }
 
-  const motoristaId = await resolverMotoristaId(supabase, empresaId, participant, null);
+  const motoristaId = await resolverMotoristaId(supabase, empresaId, participant, null, pushName);
   if (!motoristaId) {
     await enviarMensagemTexto(
       key.remoteJid,
@@ -548,6 +577,7 @@ async function processarRespostaRascunho(
   rascunho: RascunhoRow,
   texto: string,
   ia: IAContext,
+  pushName: string | null,
 ): Promise<void> {
   const numero = numeroDoJid(participant);
 
@@ -625,7 +655,7 @@ async function processarRespostaRascunho(
   const status = payloadCompleto(payloadAtualizado) ? "pendente" : "erro";
   const motoristaId =
     payloadAtualizado.motorista !== rascunho.payload.motorista
-      ? await resolverMotoristaId(supabase, empresaId, participant, payloadAtualizado.motorista)
+      ? await resolverMotoristaId(supabase, empresaId, participant, payloadAtualizado.motorista, pushName)
       : rascunho.motorista_id;
 
   await supabase
@@ -827,12 +857,13 @@ async function criarRascunho(
   origem: "whatsapp_audio" | "whatsapp_foto" | "whatsapp_texto",
   payload: RascunhoPayload | null,
   midia: { buffer: Buffer; mimeType: string } | null,
+  pushName: string | null,
 ): Promise<void> {
   const payloadFinal: RascunhoPayload = payload ?? payloadVazio();
   const status = payloadCompleto(payloadFinal) ? "pendente" : "erro";
 
   const mediaUrl = midia ? await uploadMidia(supabase, empresaId, midia) : null;
-  const motoristaId = await resolverMotoristaId(supabase, empresaId, participant, payloadFinal.motorista);
+  const motoristaId = await resolverMotoristaId(supabase, empresaId, participant, payloadFinal.motorista, pushName);
 
   await supabase.from("lancamentos_pendentes").insert({
     empresa_id: empresaId,
@@ -859,9 +890,10 @@ async function criarRascunhoComErro(
   origem: "whatsapp_audio" | "whatsapp_foto" | "whatsapp_texto",
   midia: { buffer: Buffer; mimeType: string } | null,
   motivo: string,
+  pushName: string | null,
 ): Promise<void> {
   const mediaUrl = midia ? await uploadMidia(supabase, empresaId, midia) : null;
-  const motoristaId = await resolverMotoristaId(supabase, empresaId, participant, null);
+  const motoristaId = await resolverMotoristaId(supabase, empresaId, participant, null, pushName);
 
   await supabase.from("lancamentos_pendentes").insert({
     empresa_id: empresaId,
