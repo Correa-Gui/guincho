@@ -20,7 +20,7 @@ import {
 import { EnderecoAutocomplete } from "@/components/shared/endereco-autocomplete";
 import type { EnderecoSugestao } from "@/lib/enderecos";
 import { formatCurrency, todayInputValue } from "@/lib/format";
-import { VIAGEM_STATUS_LABEL, type Motorista, type VeiculoFrota, type Viagem } from "@/lib/types";
+import { VIAGEM_STATUS_LABEL, type Cliente, type Motorista, type VeiculoFrota, type Viagem } from "@/lib/types";
 import {
   sugerirRota,
   type SugestaoRota,
@@ -34,11 +34,13 @@ export function ViagemForm({
   viagem,
   motoristas,
   veiculos,
+  clientes,
 }: {
   action: Action;
   viagem?: Viagem;
   motoristas: Motorista[];
   veiculos: VeiculoFrota[];
+  clientes: Cliente[];
 }) {
   const [state, formAction, pending] = useActionState(action, {});
 
@@ -329,9 +331,15 @@ export function ViagemForm({
           <Input
             id="segurado"
             name="segurado"
+            list="clientes-datalist"
             placeholder="Nome do segurado/cliente"
             defaultValue={viagem?.segurado ?? ""}
           />
+          <datalist id="clientes-datalist">
+            {clientes.map((cliente) => (
+              <option key={cliente.id} value={cliente.nome} />
+            ))}
+          </datalist>
         </div>
 
         <div className="flex flex-col gap-2">

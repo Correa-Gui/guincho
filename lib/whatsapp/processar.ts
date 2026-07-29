@@ -5,6 +5,7 @@ import { getAIProvider, AIProviderError, buscarConfiguracaoIA, categoriasDaConfi
 import { LANCAMENTO_TIPO_LABEL, type ItemRascunho, type LancamentoTipo } from "@/lib/types";
 import { formatCurrency, formatDate, formatKm, validarPlaca } from "@/lib/format";
 import { resolverLocalizacao } from "@/lib/enderecos";
+import { resolverClienteId } from "@/lib/clientes";
 import { getRota } from "@/lib/rotas";
 import { baixarMidiaMensagem, enviarMensagemTexto, numeroDoJid } from "./evolution";
 import {
@@ -30,6 +31,10 @@ const REGEX_CANCELA = /^(n[aã]o|n|cancela(r)?|errado|apaga(r)?|descarta(r)?|pul
 // Aceita com ou sem "/" na frente ("/resumo" ou "resumo diário") e um nome de
 // motorista opcional no final ("resumo motorista Bruno").
 const REGEX_RESUMO = /^\/?resumo(?:\s+di[aá]rio)?(?:\s+d[oa]\s+dia)?(?:\s+motorista\s+(.+))?\s*$/i;
+// Aceita com ou sem "/" na frente e um destino opcional ("nova viagem para Jaboticabal" / "nova viagem pra Jaboticabal").
+const REGEX_NOVA_VIAGEM = /^\/?nova\s+viagem(?:\s+(?:para|pra)\s+(.+))?\s*$/i;
+// Aceita com ou sem "/" na frente (texto digitado OU falado por áudio, que nunca transcreve a barra).
+const REGEX_ENCERRAR = /^\/?encerrar\b\s*([\s\S]*)$/i;
 
 /** Extrai só os dígitos do texto e converte pra km (inteiro). Ex: "45.890 km" -> 45890. */
 function parseKmInteiro(texto: string): number | null {
@@ -202,9 +207,33 @@ async function processarAudio(
   }
 
   const provider = getAIProvider(ia.config?.provider);
+  let transcricao: string;
+  try {
+    transcricao = await provider.transcreverAudio(midia.buffer, midia.mimeType, ia.config);
+  } catch (err) {
+    await criarRascunhoComErro(
+      supabase,
+      empresaId,
+      key,
+      participant,
+      "whatsapp_audio",
+      midia,
+      mensagemErroIA(err),
+      pushName,
+    );
+    return;
+  }
+
+  const textoLimpo = transcricao.trim();
+  if (textoLimpo) {
+    // áudio "nova viagem para X", "encerrar 45890", "resumo", confirmação/correção de rascunho
+    // pendente ou resposta de KM inicial: trata igual a texto digitado, antes de cair pra IA livre.
+    const tratado = await processarComandoOuSessao(supabase, empresaId, key, participant, textoLimpo, ia, pushName);
+    if (tratado) return;
+  }
+
   let payload: RascunhoPayload | null;
   try {
-    const transcricao = await provider.transcreverAudio(midia.buffer, midia.mimeType, ia.config);
     const interpretado = await provider.interpretarMensagem(transcricao, ia.config);
     payload = normalizarMensagem(interpretado, undefined, ia.categorias) ?? semIntencaoDetectada(transcricao);
   } catch (err) {
@@ -281,37 +310,69 @@ async function processarTexto(
   const textoLimpo = texto.trim();
   if (!textoLimpo) return;
 
+  // texto solto sem comando/sessão pendente -> ignora, sem chamar IA (evita reagir a papo comum do grupo).
+  await processarComandoOuSessao(supabase, empresaId, key, participant, textoLimpo, ia, pushName);
+}
+
+/**
+ * Dispatcher compartilhado por texto digitado e por transcrição de áudio:
+ * tenta, em ordem, comando /gasto ou /ganho, /encerrar (com ou sem barra),
+ * "resumo", "nova viagem", resposta a rascunho pendente e resposta a pergunta
+ * de KM inicial pendente. Retorna true se algum desses tratou a mensagem
+ * (chamador não precisa fazer mais nada); false se nada bateu — quem chamou
+ * decide o que fazer com o texto (processarTexto ignora; processarAudio cai
+ * para a interpretação livre da IA, já que gravar um áudio é sempre
+ * intencional, diferente de uma mensagem de texto solta no grupo).
+ */
+async function processarComandoOuSessao(
+  supabase: SupabaseClient,
+  empresaId: string,
+  key: EvolutionMessageKey,
+  participant: string,
+  textoLimpo: string,
+  ia: IAContext,
+  pushName: string | null,
+): Promise<boolean> {
+  const encerrarMatch = textoLimpo.match(REGEX_ENCERRAR);
+  if (encerrarMatch) {
+    await processarEncerramento(supabase, empresaId, key, participant, encerrarMatch[1].trim(), pushName);
+    return true;
+  }
+
   const match = textoLimpo.match(/^(\/\w+)\s*([\s\S]*)$/);
   if (match) {
     const comando = match[1].toLowerCase();
-    // /encerrar não gera lançamento (não tem tipo em COMANDOS), por isso fica fora do mapa.
-    if (comando === "/encerrar") {
-      await processarEncerramento(supabase, empresaId, key, participant, match[2].trim(), pushName);
-      return;
-    }
     if (COMANDOS[comando]) {
       await processarComando(supabase, empresaId, key, participant, COMANDOS[comando], match[2].trim(), ia, pushName);
-      return;
+      return true;
     }
   }
 
   const resumoMatch = textoLimpo.match(REGEX_RESUMO);
   if (resumoMatch) {
     await processarResumoDiario(supabase, empresaId, key, participant, resumoMatch[1]?.trim() || null);
-    return;
+    return true;
+  }
+
+  const novaViagemMatch = textoLimpo.match(REGEX_NOVA_VIAGEM);
+  if (novaViagemMatch) {
+    await processarNovaViagem(supabase, empresaId, key, participant, novaViagemMatch[1]?.trim() || null, pushName);
+    return true;
   }
 
   const rascunho = await buscarRascunhoPendente(supabase, empresaId, key.remoteJid, participant);
   if (rascunho) {
     await processarRespostaRascunho(supabase, empresaId, key, participant, rascunho, textoLimpo, ia, pushName);
-    return;
+    return true;
   }
 
-  // sem rascunho: só interessa se houver uma pergunta de km inicial pendente
   const perguntaKm = await buscarPerguntaKmPendente(supabase, empresaId, key.remoteJid, participant);
-  if (!perguntaKm) return; // conversa comum do grupo -> ignora, sem chamar IA
+  if (perguntaKm) {
+    await processarRespostaKmInicial(supabase, key, participant, perguntaKm, textoLimpo);
+    return true;
+  }
 
-  await processarRespostaKmInicial(supabase, key, participant, perguntaKm, textoLimpo);
+  return false;
 }
 
 async function processarComando(
@@ -577,6 +638,102 @@ async function processarEncerramento(
   );
 }
 
+/**
+ * Trata o comando "nova viagem" (opcionalmente "nova viagem para <destino>").
+ * Abre uma viagem "em_andamento" pro motorista (bloqueia se ele já tiver uma
+ * aberta) e dispara a mesma pergunta de KM inicial usada no fluxo pós-
+ * confirmação. Despesas soltas mandadas depois (sem origem/destino) são
+ * vinculadas a essa viagem em `salvarLancamento`.
+ */
+async function processarNovaViagem(
+  supabase: SupabaseClient,
+  empresaId: string,
+  key: EvolutionMessageKey,
+  participant: string,
+  destino: string | null,
+  pushName: string | null,
+): Promise<void> {
+  const numero = numeroDoJid(participant);
+
+  const motoristaId = await resolverMotoristaId(supabase, empresaId, participant, null, pushName);
+  if (!motoristaId) {
+    await enviarMensagemTexto(
+      key.remoteJid,
+      `@${numero}, não encontrei seu cadastro de motorista pra abrir a viagem.`,
+      participant,
+    );
+    return;
+  }
+
+  const viagemAbertaId = await buscarViagemEmAndamento(supabase, empresaId, motoristaId);
+  if (viagemAbertaId) {
+    await enviarMensagemTexto(
+      key.remoteJid,
+      `@${numero}, você já tem uma viagem em andamento. Encerre com /encerrar <km final> antes de abrir outra.`,
+      participant,
+    );
+    return;
+  }
+
+  const destinoLoc = destino ? await resolverLocalizacao(destino) : null;
+
+  const { data: viagem, error } = await supabase
+    .from("viagens")
+    .insert({
+      empresa_id: empresaId,
+      motorista_id: motoristaId,
+      destino,
+      destino_cidade: destinoLoc?.cidade ?? null,
+      destino_uf: destinoLoc?.uf ?? null,
+      destino_ibge: destinoLoc?.ibge ?? null,
+      destino_lat: destinoLoc?.lat ?? null,
+      destino_lon: destinoLoc?.lon ?? null,
+      valor: 0,
+      status: "em_andamento",
+      data: hojeISO(),
+    })
+    .select("id")
+    .single();
+
+  if (error || !viagem) {
+    console.error("[whatsapp] falha ao abrir viagem", error?.message);
+    await enviarMensagemTexto(key.remoteJid, `@${numero}, não consegui abrir a viagem, tenta de novo.`, participant);
+    return;
+  }
+
+  await supabase.from("viagem_km_perguntas").insert({
+    empresa_id: empresaId,
+    viagem_id: viagem.id,
+    grupo_jid: key.remoteJid,
+    participant,
+  });
+
+  const trajeto = destino ? ` para ${destino}` : "";
+  await enviarMensagemTexto(
+    key.remoteJid,
+    `@${numero}, viagem aberta${trajeto}! 🚛 Qual o KM inicial? Responda com o número (ex: 45890).\nDurante a viagem, pode mandar as despesas normalmente (almoço, pedágio, combustível...) que eu vinculo a essa viagem. Quando terminar, envie /encerrar <km final>.`,
+    participant,
+  );
+}
+
+/** Busca a viagem "em_andamento" mais recente do motorista, se houver (null se não tiver nenhuma). */
+async function buscarViagemEmAndamento(
+  supabase: SupabaseClient,
+  empresaId: string,
+  motoristaId: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("viagens")
+    .select("id")
+    .eq("empresa_id", empresaId)
+    .eq("motorista_id", motoristaId)
+    .eq("status", "em_andamento")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data?.id ?? null;
+}
+
 type LancamentoResumo = {
   tipo: LancamentoTipo;
   valor: number;
@@ -813,6 +970,10 @@ async function salvarLancamento(
 ): Promise<{ totalLancamentos: number; viagensCriadas: { id: string; origem: string | null; destino: string | null }[] }> {
   const { payload } = rascunho;
 
+  const viagemAberta = rascunho.motorista_id
+    ? await buscarViagemEmAndamento(supabase, empresaId, rascunho.motorista_id)
+    : null;
+
   const viagensCriadas: { id: string; origem: string | null; destino: string | null }[] = [];
   const rows = [];
   for (const item of payload.itens) {
@@ -820,6 +981,9 @@ async function salvarLancamento(
     if (item.origem && item.destino) {
       viagemId = await criarViagemDoItem(supabase, empresaId, item, rascunho.motorista_id);
       if (viagemId) viagensCriadas.push({ id: viagemId, origem: item.origem, destino: item.destino });
+    } else if (viagemAberta) {
+      // sem origem/destino próprio: se o motorista tem viagem em_andamento, vincula a despesa/ganho a ela.
+      viagemId = viagemAberta;
     }
 
     rows.push({
@@ -879,11 +1043,14 @@ async function criarViagemDoItem(
     }
   }
 
+  const clienteId = await resolverClienteId(supabase, empresaId, item.segurado);
+
   const { data: viagem, error } = await supabase
     .from("viagens")
     .insert({
       empresa_id: empresaId,
       motorista_id: motoristaId,
+      cliente_id: clienteId,
       origem: item.origem,
       destino: item.destino,
       origem_cidade: origemLoc?.cidade ?? null,

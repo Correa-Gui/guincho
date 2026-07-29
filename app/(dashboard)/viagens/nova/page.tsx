@@ -6,9 +6,10 @@ import { createViagem } from "../actions";
 export default async function NovaViagemPage() {
   const supabase = await createClient();
 
-  const [{ data: motoristas }, { data: veiculos }] = await Promise.all([
+  const [{ data: motoristas }, { data: veiculos }, { data: clientes }] = await Promise.all([
     supabase.from("motoristas").select("id, nome").eq("ativo", true).order("nome"),
     supabase.from("veiculos_frota").select("id, placa, modelo").order("placa"),
+    supabase.from("clientes").select("id, nome").order("nome"),
   ]);
 
   return (
@@ -31,6 +32,7 @@ export default async function NovaViagemPage() {
             action={createViagem}
             motoristas={motoristas ?? []}
             veiculos={veiculos ?? []}
+            clientes={clientes ?? []}
           />
         </CardContent>
       </Card>

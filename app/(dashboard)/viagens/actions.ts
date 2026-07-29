@@ -7,6 +7,7 @@ import { parseValor } from "@/lib/parse";
 import { validarPlaca } from "@/lib/format";
 import { getCoordsComFallback } from "@/lib/ibge";
 import { getRota, type PontoRota } from "@/lib/rotas";
+import { resolverClienteId } from "@/lib/clientes";
 import type { ViagemStatus } from "@/lib/types";
 
 export type ViagemFormState = { error?: string; success?: boolean; id?: string };
@@ -124,7 +125,7 @@ async function calcularRetornoBase(
   };
 }
 
-async function buildPayload(formData: FormData) {
+async function buildPayload(formData: FormData, empresaId: string) {
   const valor = parseValor(String(formData.get("valor") ?? "0"));
   if (valor === null) return null;
 
@@ -149,6 +150,9 @@ async function buildPayload(formData: FormData) {
   }
   const retorno = await calcularRetornoBase(destinoMunicipio.ponto, config.base, tarifaKm);
 
+  const segurado = (formData.get("segurado") as string) || null;
+  const clienteId = await resolverClienteId(supabase, empresaId, segurado);
+
   return {
     motorista_id: (formData.get("motorista_id") as string) || null,
     veiculo_id: veiculoId,
@@ -166,7 +170,8 @@ async function buildPayload(formData: FormData) {
     status: (formData.get("status") as string) || "agendada",
     data: (formData.get("data") as string) || new Date().toISOString().slice(0, 10),
     observacoes: (formData.get("observacoes") as string) || null,
-    segurado: (formData.get("segurado") as string) || null,
+    cliente_id: clienteId,
+    segurado,
     seguradora: (formData.get("seguradora") as string) || null,
     placa_cliente: placaClienteNormalizada(formData.get("placa_cliente") as string | null),
   };
@@ -294,7 +299,7 @@ export async function createViagem(
     .single();
   if (!usuario) return { error: "Usuário sem empresa vinculada." };
 
-  const payload = await buildPayload(formData);
+  const payload = await buildPayload(formData, usuario.empresa_id);
   if (!payload) return { error: "Valor inválido." };
 
   const { data: viagem, error } = await supabase
@@ -316,14 +321,15 @@ export async function updateViagem(
 ): Promise<ViagemFormState> {
   const supabase = await createClient();
 
-  const payload = await buildPayload(formData);
-  if (!payload) return { error: "Valor inválido." };
-
   const { data: viagemAtual } = await supabase
     .from("viagens")
     .select("empresa_id, status, valor, origem, destino, data")
     .eq("id", id)
     .single();
+  if (!viagemAtual) return { error: "Viagem não encontrada." };
+
+  const payload = await buildPayload(formData, viagemAtual.empresa_id);
+  if (!payload) return { error: "Valor inválido." };
 
   const { error } = await supabase.from("viagens").update(payload).eq("id", id);
   if (error) return { error: "Não foi possível salvar a viagem." };
