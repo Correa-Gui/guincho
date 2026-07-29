@@ -584,6 +584,12 @@ type LancamentoResumo = {
   motoristas: { nome: string } | null;
 };
 
+type ViagemKmResumo = {
+  km_rodado: number | null;
+  motorista_id: string | null;
+  motoristas: { nome: string } | null;
+};
+
 /**
  * "resumo" / "resumo diário" / "/resumo" -> totais de hoje da empresa toda,
  * com quebra por motorista. "resumo motorista <nome>" -> só os lançamentos
@@ -628,10 +634,22 @@ async function processarResumoDiario(
     .eq("data", hoje);
   if (motoristaId) query.eq("motorista_id", motoristaId);
 
-  const { data: lancamentos } = await query.returns<LancamentoResumo[]>();
-  const itens = lancamentos ?? [];
+  const kmQuery = supabase
+    .from("viagens")
+    .select("km_rodado, motorista_id, motoristas(nome)")
+    .eq("empresa_id", empresaId)
+    .eq("data", hoje)
+    .not("km_rodado", "is", null);
+  if (motoristaId) kmQuery.eq("motorista_id", motoristaId);
 
-  if (itens.length === 0) {
+  const [{ data: lancamentos }, { data: viagensKm }] = await Promise.all([
+    query.returns<LancamentoResumo[]>(),
+    kmQuery.returns<ViagemKmResumo[]>(),
+  ]);
+  const itens = lancamentos ?? [];
+  const viagens = viagensKm ?? [];
+
+  if (itens.length === 0 && viagens.length === 0) {
     const quem = motoristaNome ? ` de ${motoristaNome}` : "";
     await enviarMensagemTexto(key.remoteJid, `@${numero}, nenhum lançamento${quem} hoje ainda. 📭`, participant);
     return;
@@ -640,6 +658,7 @@ async function processarResumoDiario(
   const ganhos = itens.filter((i) => i.tipo === "receita").reduce((soma, i) => soma + i.valor, 0);
   const gastos = itens.filter((i) => i.tipo === "despesa").reduce((soma, i) => soma + i.valor, 0);
   const saldo = ganhos - gastos;
+  const kmTotal = viagens.reduce((soma, v) => soma + (v.km_rodado ?? 0), 0);
 
   const titulo = motoristaNome
     ? `📅 Resumo de ${formatDate(hoje)} — ${motoristaNome}`
@@ -650,6 +669,7 @@ async function processarResumoDiario(
     `💰 Ganhos: ${formatCurrency(ganhos)}`,
     `💸 Gastos: ${formatCurrency(gastos)}`,
     `${saldo >= 0 ? "📈" : "📉"} Saldo: ${formatCurrency(saldo)}`,
+    `🛣️ Km rodado: ${formatKm(kmTotal)}`,
   ];
 
   if (!motoristaNome) {
@@ -663,6 +683,18 @@ async function processarResumoDiario(
       linhas.push("", "Por motorista:");
       for (const [nome, total] of porMotorista) {
         linhas.push(`🚛 ${nome} — ${formatCurrency(total)}`);
+      }
+    }
+
+    const kmPorMotorista = new Map<string, number>();
+    for (const viagem of viagens) {
+      const nome = viagem.motoristas?.nome ?? "Sem motorista";
+      kmPorMotorista.set(nome, (kmPorMotorista.get(nome) ?? 0) + (viagem.km_rodado ?? 0));
+    }
+    if (kmPorMotorista.size > 0) {
+      linhas.push("", "Km por motorista:");
+      for (const [nome, km] of kmPorMotorista) {
+        linhas.push(`🛣️ ${nome} — ${formatKm(km)}`);
       }
     }
   }
