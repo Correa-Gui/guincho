@@ -65,7 +65,7 @@ REGRA-CHAVE — UMA MENSAGEM PODE CONTER VÁRIOS LANÇAMENTOS:
 - Um valor citado como GASTO é SEMPRE um item "despesa", mesmo que a frase principal seja sobre uma receita/recebimento (e vice-versa). NUNCA embuta um gasto na descrição de um item de receita (ou um recebimento na descrição de uma despesa) — sempre crie um item próprio.
 
 Para cada item em "itens":
-- "tipo": "receita" ou "despesa".
+- "tipo": "receita" ou "despesa". A empresa é uma transportadora/guincho: um serviço de remoção/reboque/socorro/resgate EXECUTADO por ela (o job em si, "fiz uma remoção", "socorro de X até Y") é SEMPRE "receita" — a empresa é PAGA pra isso, nunca paga por isso. "despesa" é só gasto operacional (combustível, pedágio, manutenção, alimentação, salário) — nunca o serviço de guincho em si.
 - "valor": valor em reais como número (ex: 50, 1234.56). Se esse item não tiver valor identificável, null.
 - "categoria": se "tipo" for "despesa", escolha entre: {{CATEGORIAS_DESPESA}}. Se "receita", escolha entre: {{CATEGORIAS_RECEITA}} — remoção/reboque/socorro/resgate/pane/sinistro (serviço de guincho em si) é sempre "Guincho", mesmo sem a palavra "guincho" na mensagem; "Frete" é só transporte de carga sem pane/acidente; use "Outros" apenas se nenhum dos dois se aplicar.
 - "data": data desse lançamento específico (YYYY-MM-DD), se diferente da data padrão da mensagem. Senão null.
