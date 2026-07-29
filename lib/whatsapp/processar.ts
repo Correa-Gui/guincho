@@ -27,6 +27,9 @@ const COMANDOS: Record<string, LancamentoTipo> = {
 
 const REGEX_CONFIRMA = /^(sim|s|confirma(do)?|confirmar|isso|correto|certo|ok)\b/i;
 const REGEX_CANCELA = /^(n[aã]o|n|cancela(r)?|errado|apaga(r)?|descarta(r)?|pular|depois|agora n[aã]o)\b/i;
+// Aceita com ou sem "/" na frente ("/resumo" ou "resumo diário") e um nome de
+// motorista opcional no final ("resumo motorista Bruno").
+const REGEX_RESUMO = /^\/?resumo(?:\s+di[aá]rio)?(?:\s+d[oa]\s+dia)?(?:\s+motorista\s+(.+))?\s*$/i;
 
 /** Extrai só os dígitos do texto e converte pra km (inteiro). Ex: "45.890 km" -> 45890. */
 function parseKmInteiro(texto: string): number | null {
@@ -290,6 +293,12 @@ async function processarTexto(
       await processarComando(supabase, empresaId, key, participant, COMANDOS[comando], match[2].trim(), ia, pushName);
       return;
     }
+  }
+
+  const resumoMatch = textoLimpo.match(REGEX_RESUMO);
+  if (resumoMatch) {
+    await processarResumoDiario(supabase, empresaId, key, participant, resumoMatch[1]?.trim() || null);
+    return;
   }
 
   const rascunho = await buscarRascunhoPendente(supabase, empresaId, key.remoteJid, participant);
@@ -566,6 +575,99 @@ async function processarEncerramento(
     `@${numero}, viagem encerrada${trajeto}! KM rodado: ${formatKm(kmRodado)}. ✅`,
     participant,
   );
+}
+
+type LancamentoResumo = {
+  tipo: LancamentoTipo;
+  valor: number;
+  motorista_id: string | null;
+  motoristas: { nome: string } | null;
+};
+
+/**
+ * "resumo" / "resumo diário" / "/resumo" -> totais de hoje da empresa toda,
+ * com quebra por motorista. "resumo motorista <nome>" -> só os lançamentos
+ * desse motorista (ilike, mesmo critério usado em resolverMotoristaId).
+ */
+async function processarResumoDiario(
+  supabase: SupabaseClient,
+  empresaId: string,
+  key: EvolutionMessageKey,
+  participant: string,
+  motoristaFiltro: string | null,
+): Promise<void> {
+  const numero = numeroDoJid(participant);
+  const hoje = hojeISO();
+
+  let motoristaNome: string | null = null;
+  let motoristaId: string | null = null;
+  if (motoristaFiltro) {
+    const { data } = await supabase
+      .from("motoristas")
+      .select("id, nome")
+      .eq("empresa_id", empresaId)
+      .ilike("nome", `%${motoristaFiltro}%`)
+      .limit(1)
+      .maybeSingle();
+    if (!data) {
+      await enviarMensagemTexto(
+        key.remoteJid,
+        `@${numero}, não achei motorista "${motoristaFiltro}" cadastrado.`,
+        participant,
+      );
+      return;
+    }
+    motoristaId = data.id;
+    motoristaNome = data.nome;
+  }
+
+  const query = supabase
+    .from("lancamentos_financeiros")
+    .select("tipo, valor, motorista_id, motoristas(nome)")
+    .eq("empresa_id", empresaId)
+    .eq("data", hoje);
+  if (motoristaId) query.eq("motorista_id", motoristaId);
+
+  const { data: lancamentos } = await query.returns<LancamentoResumo[]>();
+  const itens = lancamentos ?? [];
+
+  if (itens.length === 0) {
+    const quem = motoristaNome ? ` de ${motoristaNome}` : "";
+    await enviarMensagemTexto(key.remoteJid, `@${numero}, nenhum lançamento${quem} hoje ainda. 📭`, participant);
+    return;
+  }
+
+  const ganhos = itens.filter((i) => i.tipo === "receita").reduce((soma, i) => soma + i.valor, 0);
+  const gastos = itens.filter((i) => i.tipo === "despesa").reduce((soma, i) => soma + i.valor, 0);
+  const saldo = ganhos - gastos;
+
+  const titulo = motoristaNome
+    ? `📅 Resumo de ${formatDate(hoje)} — ${motoristaNome}`
+    : `📅 Resumo de ${formatDate(hoje)}`;
+
+  const linhas = [
+    titulo,
+    `💰 Ganhos: ${formatCurrency(ganhos)}`,
+    `💸 Gastos: ${formatCurrency(gastos)}`,
+    `${saldo >= 0 ? "📈" : "📉"} Saldo: ${formatCurrency(saldo)}`,
+  ];
+
+  if (!motoristaNome) {
+    const porMotorista = new Map<string, number>();
+    for (const item of itens) {
+      const nome = item.motoristas?.nome ?? "Sem motorista";
+      const sinal = item.tipo === "receita" ? item.valor : -item.valor;
+      porMotorista.set(nome, (porMotorista.get(nome) ?? 0) + sinal);
+    }
+    if (porMotorista.size > 0) {
+      linhas.push("", "Por motorista:");
+      for (const [nome, total] of porMotorista) {
+        linhas.push(`🚛 ${nome} — ${formatCurrency(total)}`);
+      }
+    }
+  }
+
+  await enviarMensagemTexto(key.remoteJid, linhas.join("\n"), participant);
 }
 
 /** Trata a resposta do participant a um rascunho pendente: confirmar, cancelar ou corrigir. */
