@@ -73,7 +73,7 @@ Para cada item em "itens":
 - "origem" e "destino": se o item descrever um trajeto/serviço entre dois lugares (ex: "socorro de X até Y", "frete de X pra Y", "viagem de X a Y"), preencha com os nomes dos lugares mencionados (cidades), sem prefixos como "de"/"até". Se a mensagem não mencionar um trajeto, ambos null.
 - "segurado": nome do segurado/cliente dono do veículo guinchado. Seja INTERPRETATIVO — não exige a palavra "cliente"/"segurado" antes do nome: em mensagens de guincho/remoção/socorro, um nome próprio (pessoa ou empresa) logo depois do verbo/serviço, sem outro papel claro (não é motorista, não é seguradora, não é cidade), É o segurado (ex: "segurado: Maria Silva", "cliente: João", "remoção cliente João Abel", "lançar remoção Tobassi" → segurado "Tobassi"). Só deixa null se a mensagem não der pra saber de quem é o veículo.
 - "seguradora": se a mensagem citar explicitamente o nome da seguradora responsável pelo sinistro (ex: "seguradora: Porto Seguro", "seguradora Azul Seguros"), extraia só o nome — é diferente do segurado (a seguradora é a empresa, o segurado é a pessoa dona do veículo). Senão null.
-- "placa": se a mensagem citar a placa do veículo do cliente guinchado (ex: "placa ABC1D23", "placa: ABC-1234"), extraia exatamente como veio na mensagem (não normalize). Senão null.
+- "placa": se a mensagem citar a placa do veículo do cliente guinchado (ex: "placa ABC1D23", "placa: ABC-1234"), extraia exatamente como veio na mensagem (não normalize). Uma placa SEMPRE mistura letras e números (formatos AAA0000 ou AAA0A00) — NUNCA extraia como placa o modelo/marca do veículo (ex: "veículo Triton", "carro Hilux", "caminhão Munk", "S10"): isso é só descrição, não placa. Só preencha "placa" quando houver um código nesse formato ou a palavra "placa" explicitamente citada com um código junto. Senão null.
 
 Exemplos:
 
@@ -106,6 +106,9 @@ Resposta: {"intencao": "receita", "data": null, "motorista": null, "itens": [{"t
 
 Mensagem: "Lançar remoção Tobassi, caminhão munk, de Taquaritinga pra Jaboticabal, 2000 reais"
 Resposta: {"intencao": "receita", "data": null, "motorista": null, "itens": [{"tipo": "receita", "valor": 2000, "categoria": "Guincho", "data": null, "descricao": "Remoção Tobassi, veículo caminhão munk", "origem": "Taquaritinga", "destino": "Jaboticabal", "segurado": "Tobassi", "seguradora": null, "placa": null}]}
+
+Mensagem: "Lançar serviço veículo Triton, cliente Allianz, origem Jaboticabal destino Jaboticabal, valor 300 reais"
+Resposta: {"intencao": "receita", "data": null, "motorista": null, "itens": [{"tipo": "receita", "valor": 300, "categoria": "Guincho", "data": null, "descricao": "Remoção, veículo Triton", "origem": "Jaboticabal", "destino": "Jaboticabal", "segurado": "Allianz", "seguradora": null, "placa": null}]}
 
 Mensagem: "sim"
 Resposta: {"intencao": "confirmacao", "data": null, "motorista": null, "itens": []}

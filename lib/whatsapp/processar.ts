@@ -35,6 +35,10 @@ const REGEX_RESUMO = /^\/?resumo(?:\s+di[aá]rio)?(?:\s+d[oa]\s+dia)?(?:\s+motor
 const REGEX_NOVA_VIAGEM = /^\/?nova\s+viagem(?:\s+(?:para|pra)\s+(.+))?\s*$/i;
 // Aceita com ou sem "/" na frente (texto digitado OU falado por áudio, que nunca transcreve a barra).
 const REGEX_ENCERRAR = /^\/?encerrar\b\s*([\s\S]*)$/i;
+// Resposta plausível a "qual o KM inicial?": só dígitos/pontuação, opcionalmente seguido de "km".
+// Existe pra não deixar qualquer mensagem com números soltos (ex: um novo serviço com valor em
+// reais) ser engolida como resposta a uma pergunta de KM antiga e esquecida.
+const REGEX_KM_RESPOSTA = /^[\d.,\s]+(km)?\s*$/i;
 
 /** Extrai só os dígitos do texto e converte pra km (inteiro). Ex: "45.890 km" -> 45890. */
 function parseKmInteiro(texto: string): number | null {
@@ -367,7 +371,7 @@ async function processarComandoOuSessao(
   }
 
   const perguntaKm = await buscarPerguntaKmPendente(supabase, empresaId, key.remoteJid, participant);
-  if (perguntaKm) {
+  if (perguntaKm && (REGEX_CANCELA.test(textoLimpo) || REGEX_KM_RESPOSTA.test(textoLimpo))) {
     await processarRespostaKmInicial(supabase, key, participant, perguntaKm, textoLimpo);
     return true;
   }

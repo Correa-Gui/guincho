@@ -61,7 +61,10 @@ function normalizarItem(
     destino: item.destino,
     segurado: item.segurado,
     seguradora: item.seguradora,
-    placaCliente: item.placaCliente ? validarPlaca(item.placaCliente).normalizada : null,
+    // Placa sempre mistura letra e número nos dois formatos aceitos (AAA0000/AAA0A00); uma string só
+    // de letras (ex: a IA confundindo "veículo Triton" com placa) não é sequer uma placa com erro de
+    // digitação, é a IA extraindo o campo errado — descarta em vez de guardar lixo/avisar à toa.
+    placaCliente: item.placaCliente && /\d/.test(item.placaCliente) ? validarPlaca(item.placaCliente).normalizada : null,
   };
 }
 
